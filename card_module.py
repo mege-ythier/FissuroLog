@@ -115,6 +115,8 @@ def generate_upload_card():
         children=[
             html.Button('afficher les informations du capteur',
                         id='button-show-metadata',hidden=True),
+            html.Button('Supprimer un capteur',
+                        id='button-delete-table', hidden=True),
             dcc.Upload(
                 id='upload-file',
                 children="Télécharger des mesures",

@@ -70,21 +70,15 @@ app.layout = html.Div(
 
                 html.Div(id='ingest-info'),
                 dcc.ConfirmDialog(
-                    id='confirm-throw-ingestion',
-                    message='attention'
+                    id='confirm-throw-ingestion'
                 ),
 
                 dcc.ConfirmDialog(
-                    id='confirm-read-message',
-                    message='attention'
+                    id='confirm-read-message'
                 ),
-                # html.Button('dev-test', id='button-test'),
-                # dcc.Upload(
-                #     id='upload-image-test',
-                #     children="test télécharge une image de ton capteur",
-                #     style={ 'width': '30%'},
-                #     multiple=False
-                # ),
+                dcc.ConfirmDialog(
+                    id='confirm-delete-table'
+                ),
 
             ]
         )
@@ -218,7 +212,10 @@ def encode_image(image_path):
     Output('textarea-pk', "value"),
     Output('textarea-lat', "value"),
     Output('textarea-long', "value"),
+    Output('textarea-date-pose', "value"),
+    Output('textarea-date-depose', "value"),
     Output('button-show-metadata', 'hidden'),
+    Output('button-delete-table', 'hidden'),
     # Output('form-card', 'hidden', allow_duplicate=True),
     Input('button_update_fig', 'n_clicks'),
     Input('dropdown-table', 'value'),
@@ -232,12 +229,14 @@ def main_callback(n_clicks, table_name, start_date, end_date, aggregate, data):
     fig = fig0
     fig_message = "aucune donnée"
     image_card = html.P("")
-    sensor_num, zone, pk, place, lat, long = "", "", "", "", "", ""
+    sensor_num, zone, pk, place, lat, long,date_pose,date_depose = "", "", "", "", "", "", "", ""
     button_show_metadata_is_hidden = True
+    button_delete_table_is_hidden = True
     sensors_df = pd.DataFrame(data)
     sensors_df = sensors_df.set_index("Table")
     if table_name:
         button_show_metadata_is_hidden = False
+        button_delete_table_is_hidden = False
         sensor_num = sensors_df.loc[table_name, "Num"]
         zone = sensors_df.loc[table_name, "Zone"]
         place = sensors_df.loc[table_name, "Lieu"]
@@ -245,6 +244,8 @@ def main_callback(n_clicks, table_name, start_date, end_date, aggregate, data):
         long = sensors_df.loc[table_name, "Longitude"]
         delta_mm = sensors_df.loc[table_name, "Ouverture_debut"]
         pk = sensors_df.loc[table_name, "pk"]
+        date_pose = sensors_df.loc[table_name, "Date_debut"]
+        date_depose = sensors_df.loc[table_name, "Date_fin"]
         # if numpy.isnan(pk): pk = ""
 
         start_date_timestamp = datetime.strptime(start_date, "%Y-%m-%d").timestamp()
@@ -288,8 +289,8 @@ def main_callback(n_clicks, table_name, start_date, end_date, aggregate, data):
             image_card = html.Img(src=encode_image(image_displayed), width='100%'),
 
     return (store, fig, True, {'background-color': 'rgb(0, 170, 145)'}, fig_message,
-            image_card, str(sensor_num), zone, place, str(pk), str(lat), str(long),
-            button_show_metadata_is_hidden)  # , form_card_is_hidden)
+            image_card, str(sensor_num), zone, place, str(pk), str(lat), str(long), str(date_pose), str(date_depose),
+            button_show_metadata_is_hidden, button_delete_table_is_hidden)  # , form_card_is_hidden)
 
 
 @callback(
@@ -328,15 +329,14 @@ def ingest_first_step(contents, filename):
     prevent_initial_call=True, interval=10000)
 def ingest_middle_step(click, table_select, tables, model, num, net, line, zone, lieu, pk, long, lat, date_pose,
                        date_depose):
-
     if click is None:
         raise PreventUpdate
 
     elif table_select is not None:
         confirm_message = f"""
         Les données de ton fichier vont étre intégrées au capteur {table_select}.  
-        Si oui,click ok
-        Si non, click annuler puis décoche la table dans les options        
+        click ok, pour lancer l'intégration
+        click annuler puis décoche la table dans les options        
 """
         return True, confirm_message, {"Table": table_select}, confirm_message
 
@@ -376,12 +376,11 @@ def ingest_middle_step(click, table_select, tables, model, num, net, line, zone,
         line = line[0]
         net = net[0]
         # a voir
-        zone_name = "_".join(name for name in [zone, lieu] if name)
+        #zone_name = "_".join(name for name in [zone, lieu] if name)
         # table_created = net + line + "_" + zone_name + "_" + num
-
-        date_pose_timestamp = datetime.strptime(date_pose, "%d/%m/%Y").timestamp()
-        # todo prendre le timestamp de la journee
-        table_created = net + line + "_" + num + "_" + str(int(date_pose_timestamp))
+        date_pose = datetime.strptime(date_pose, "%d/%m/%Y")
+        date_pose_str = date_pose.strftime("%Y%m%d")
+        table_created = net + line + "_" + num + "_" + date_pose_str
 
         if table_created in tables:
             confirm_message = f"""
@@ -404,7 +403,7 @@ Si non, presses sur OK pour lancer l'ingestion.
 
         metadata = {'Reseau': net, 'Ligne': line, 'Zone': zone, 'Lieu': lieu, 'pk': pk, 'Modele': model,
                     'Num': num,
-                    'Latitude': lat, 'Longitude': long, 'Date_debut': '06/01/1900', 'Date_fin': '06/01/2030',
+                    'Latitude': lat, 'Longitude': long, 'Date_debut': date_pose, 'Date_fin': date_depose,
                     'Ouverture_debut': 0, 'Table': table_created}
 
         return True, confirm_message, metadata, confirm_message
@@ -442,70 +441,72 @@ def show_message_upload_image(contents):
 def ingest_final_step(click, data, all_metadata, metadata, image_contents):
     image_upload_info = ["aucune image uploadée"]
     # quand on lance l'appli le submit_n_clicks de confirm-throw-ingestion prend la valeur None et donc il y a un call
-    if any(value is None for value in [click, data, metadata]):
-        raise PreventUpdate()
-
-    table_name = metadata["Table"]
-    # todo: est ce qu'on garde la route dans le nom de la table?
-    route = table_name.split("_")[0]
-
-    df = pd.DataFrame(data)
-
-    # extraire la liste des capteurs de la route avant l'ingestion
-    conn = sqlite3.connect('data_capteur/database.db')
-    cursor = conn.cursor()
-    cursor.execute(f"""
-    SELECT name
-    FROM sqlite_master
-    WHERE type='table' AND name like '{route}%';""")
-    tables_name = cursor.fetchall()
-    tables_name = [x[0] for x in tables_name]
-    conn.close()
-
-    # sauvegarder les données dans la database
-    save_in_database(df, table_name)
-
-    # extraire des infos de la table ingérée
-    conn = sqlite3.connect('data_capteur/database.db')
-    cursor = conn.cursor()
-    cursor.execute(f"SELECT COUNT(*) FROM {table_name};")
-    table_length = cursor.fetchone()[0]
-    # cursor.execute(f"PRAGMA table_info({table_name})")
-    # columns_info = cursor.fetchall()
-    conn.close()
-
-    if not table_name in tables_name:
-        tables_name.append(table_name)
-        all_metadata.append(metadata)
-
-    database_info = (
-            [f""" ### Information sur l'ingestion.
-{table_length} mesures sont associées au capteur {table_name}.  
-La liste des capteurs de la ligne {route} est :"""] + [f"- {table}\n" for table in tables_name]
-    )
-
-    try:
-        content_format, content_string = image_contents.split(',')
-        if content_format != "data:image/png;base64":
-            raise ValueError("Erreur : le fichier n'est pas une image au format png")
-        decoded = base64.b64decode(content_string)
-        images_path = f"data_capteur/images/{table_name}"
-        if table_name not in os.listdir("data_capteur/images"): os.makedirs(images_path)
-
-        images_name_file = os.listdir(images_path)
-        images_number = [int(x.split(".")[0]) for x in images_name_file]
-        image_number = 1
-        if len(images_name_file) > 0:
-            image_number = max(images_number) + 1
-    except (AttributeError, ValueError):
-        image_upload_info = ["echec de l'intégration de l'image"]
+    # if any(value is None for value in [click, data, metadata]):
+    #     raise PreventUpdate()
+    if click is None: raise PreventUpdate
     else:
-        with open(f'{images_path}/{image_number}.png', 'wb') as f:
-            f.write(decoded)
-        image_upload_info = ["succes de l'intégration de l'image"]
 
-    return database_info + image_upload_info, all_metadata, False, [generate_upload_card(), generate_form_card(),
-                                                                    html.Div(id="button-card")]
+        table_name = metadata["Table"]
+        # todo: est ce qu'on garde la route dans le nom de la table?
+        route = table_name.split("_")[0]
+
+        df = pd.DataFrame(data)
+
+        # extraire la liste des capteurs de la route avant l'ingestion
+        conn = sqlite3.connect('data_capteur/database.db')
+        cursor = conn.cursor()
+        cursor.execute(f"""
+        SELECT name
+        FROM sqlite_master
+        WHERE type='table' AND name like '{route}%';""")
+        tables_name = cursor.fetchall()
+        tables_name = [x[0] for x in tables_name]
+        conn.close()
+
+        # sauvegarder les données dans la database
+        save_in_database(df, table_name)
+
+        # extraire des infos de la table ingérée
+        conn = sqlite3.connect('data_capteur/database.db')
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT COUNT(*) FROM {table_name};")
+        table_length = cursor.fetchone()[0]
+        # cursor.execute(f"PRAGMA table_info({table_name})")
+        # columns_info = cursor.fetchall()
+        conn.close()
+
+        if not table_name in tables_name:
+            tables_name.append(table_name)
+            all_metadata.append(metadata)
+
+        database_info = (
+                [f""" ### Information sur l'ingestion.
+    {table_length} mesures sont associées au capteur {table_name}.  
+    La liste des capteurs de la ligne {route} est :"""] + [f"- {table}\n" for table in tables_name]
+        )
+
+        try:
+            content_format, content_string = image_contents.split(',')
+            if content_format != "data:image/png;base64":
+                raise ValueError("Erreur : le fichier n'est pas une image au format png")
+            decoded = base64.b64decode(content_string)
+            images_path = f"data_capteur/images/{table_name}"
+            if table_name not in os.listdir("data_capteur/images"): os.makedirs(images_path)
+
+            images_name_file = os.listdir(images_path)
+            images_number = [int(x.split(".")[0]) for x in images_name_file]
+            image_number = 1
+            if len(images_name_file) > 0:
+                image_number = max(images_number) + 1
+        except (AttributeError, ValueError):
+            image_upload_info = ["echec de l'intégration de l'image"]
+        else:
+            with open(f'{images_path}/{image_number}.png', 'wb') as f:
+                f.write(decoded)
+            image_upload_info = ["succes de l'intégration de l'image"]
+
+        return database_info + image_upload_info, all_metadata, False, [generate_upload_card(), generate_form_card(),
+                                                                        html.Div(id="button-card")]
 
 
 @callback(Output('form-card', 'hidden', allow_duplicate=True),
@@ -533,11 +534,10 @@ def show_form_card(click):
     State('textarea-pk', 'value'),
     State('textarea-delta', 'value'),
     State('upload-image', 'contents'),
-
     Prevent_initial_call=True, interval=10000, prevent_initial_call='initial_duplicate'
     # Prevent_initial_call=True, interval=10000
 )
-def update_sensors_info(click, sensors_data_stored, table_name, lat, long, pk, delta,image_contents):
+def update_sensors_info(click, sensors_data_stored, table_name, lat, long, pk, delta, image_contents):
     if click is None or table_name is None:
         raise PreventUpdate
 
@@ -570,9 +570,9 @@ def update_sensors_info(click, sensors_data_stored, table_name, lat, long, pk, d
 
         sensors_df.reset_index(inplace=True)
         sensors_data_stored = sensors_df.to_dict('records')
-        message= "information du capteur mis a jour"
-        #ajouter une image
-        if image_contents :
+        message = "information du capteur mis a jour"
+        # ajouter une image
+        if image_contents:
             content_format, content_string = image_contents.split(',')
             decoded = base64.b64decode(content_string)
             images_path = f"data_capteur/images/{table_name}"
@@ -588,27 +588,60 @@ def update_sensors_info(click, sensors_data_stored, table_name, lat, long, pk, d
         return message, sensors_data_stored
 
 
+@callback(
+    Output('confirm-delete-table', 'displayed'),
+    Output('confirm-delete-table', 'message'),
+    #Output('store-map-csv', 'data',allow_duplicate=True),
+    Input('button-delete-table', 'n_clicks'),
+    State('dropdown-table', 'value'),
+    State('store-map-csv', 'data'),
+    prevent_initial_call=True, interval=10000)
+def delete_table_first_step(click, table_select, sensors_data):
+    if click is None:
+        raise PreventUpdate
+    elif table_select is None:
+        raise PreventUpdate
+    else :
+        confirm_message = f"""
+    Les données du capteurs {table_select} vont être supprimer.         
+"""
+        return True, confirm_message
+
+@callback(
+    # Output('confirm-delete-table', 'message'),
+    Output('store-map-csv', 'data',allow_duplicate=True),
+    Input('confirm-delete-table', 'submit_n_clicks'),
+    State('dropdown-table', 'value'),
+    State('store-map-csv', 'data'),
+    prevent_initial_call=True, interval=10000)
+def delete_table_final_step(click,  table_select, sensors_data):
+    if click is None:
+        raise PreventUpdate
+    elif table_select is None:
+        raise PreventUpdate
+    else:
+        sensors_df = pd.DataFrame(sensors_data)
+        sensors_df.set_index("Table",inplace=True)
+        sensors_df.drop(table_select,inplace=True, axis=0)
+        sensors_df.reset_index(inplace=True)
+
+        conn = sqlite3.connect('data_capteur/database.db')
+        cursor = conn.cursor()
+        cursor.execute(f"""DROP TABLE IF EXISTS {table_select} """)
+        conn.commit()
 
 
+
+        return sensors_df.to_dict('records')
 
 
 @callback(Output('map', 'figure'),
           Input('store-map-csv', 'data'))
 def update_map(sensors_dict):
+    print("update map store")
     sensors_df = pd.DataFrame(sensors_dict)
     sensors_df.to_csv("data_capteur/map.csv", index=False, sep=";", header=True, mode="w")
     return create_map(sensors_dict)
-
-
-# @app.callback(
-#     Output('image-card', 'children', allow_duplicate=True),
-#     Input('button-test', 'n_clicks'),
-#     State('dropdown-table', 'value'),
-#     prevent_initial_call=True)
-# def test(click, table_name):
-#     if table_name not in os.listdir("data_capteur/images"):
-#         os.makedirs(f"data_capteur/images/{table_name}")
-#     return html.P(f"data_capteur/images/{table_name}")
 
 
 if __name__ == '__main__':
