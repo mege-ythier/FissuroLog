@@ -1,0 +1,159 @@
+/* Grid
+–––––––––––––––––––––––––––––––––––––––––––––––––– */
+body, h1, h2, h3, h4, h5, p, div {
+    color : rgb(10, 0, 130);
+    margin: 0;
+    padding: 0;
+    font-family:  Calibri;
+}
+
+h1 {
+    font-size: 50px;
+    font-family: Montserrat, serif;
+    font-weight: 2000
+}
+
+h2 {color : rgb(255, 255, 255);
+    font-size: 20px;
+    font-family: Montserrat, serif;
+    font-weight: 2000;
+    margin-left: 20px;
+    margin-right: 5px;
+
+}
+
+h5 {
+    font-weight: 2000;
+    margin-left: 0px;
+}
+
+
+/* Conteneur principal du tableau de bord */
+#app-container {
+    background-image:url('mur_brique.jpg') ;
+    background-size: cover;
+    width: 90%;
+    padding: 20px 100px 20px 50px;
+    display: block;
+    margin: 0px 0px 0px 0px;
+    
+
+}
+
+    .header{
+        /*background-color:rgb(243, 170, 227);*/
+        display: inline ;
+        height: 50px;
+        padding: 0px 5px;
+    }
+
+    /*last modif column from row*/
+    #app-container-inner{
+        width: 100%;
+        display: block;
+        background-color: rgb(155,210,200);
+        margin: 0px 0px 0px 0px;
+        padding: 0px 50px 0px 0px;
+    }
+        #select-data-card {
+            width: 100%;
+            display: flex;
+            flex-direction: row;
+            margin: 0px 0px 0px 0px;
+            padding: 0px 0px 0px 0px;
+            border: 5px solid rgb(235, 45, 54) 
+        
+        }
+
+            #image-card {
+                width: 25%;
+                border: 5px solid rgb(215, 81, 193);
+                margin: 10px 10px 10px 10px;
+                padding: 0px 0px 0px 0px;
+            }
+
+            #vertical-card {
+                width: 70%;
+                margin: 10px 10px 10px 10px;
+                padding: 0px 0px 0px 0px;
+                border: 5px solid rgb(45, 226, 235)       
+            }
+
+                    #map-card {
+                        border: 5px solid rgb(215, 184, 81);
+                        margin: 10px 10px 10px 10px;
+                    
+                    }  
+
+                    #options-card {
+                        /*width: 100%;*/
+                        display: flex;
+                        flex-direction: row;
+                        background-color:rgb(0, 170, 145);
+                        margin: 10px 10px 10px 10px;
+                        padding: 10px 10px 10px 10px;
+                        box-shadow: 10px 5px 5px rgba(32, 32, 33, 0.7);    
+                    }   
+
+        #time-series-card {
+            width: 100%;
+            margin: 10px 10px 10px 10px;
+            /*background-color:rgb(245, 250, 245);;*/
+            border: 5px solid rgb(83, 215, 81);
+        }
+
+        #ingest-card {
+            border: 5px solid rgb(242, 221, 29);
+            display: flex;
+            flex-direction: row;
+
+        }
+        
+            #upload-card {
+                background-color: rgba(132, 159, 225, 0.749);
+                border: 5px solid rgb(7, 11, 241);
+                margin: 0px 0px 0px 0px;
+                padding: 0px 0px 0px 0px;
+            }     
+
+            #form-card {
+    
+                border: 5px solid rgb(242, 29, 228);
+                margin: 0px 0px 0px 0px;
+                padding: 0px 0px 0px 0px;
+             
+
+
+
+            }     
+            
+        
+
+
+button {
+
+    padding: 20px 20px; /* Espacement intérieur du bouton */
+    
+    font-size: 10px;   /* Taille de la police */
+    background-color: #879293; /* Couleur de fond */
+    color: white;       /* Couleur du texte */
+    border: 10px;       /* Suppression de la bordure */
+    margin: 10px 10px 10px 10px;
+
+    border-radius: 50px; /* Bordure arrondie */
+    cursor: pointer;    /* Curseur pointeur au survol */
+}
+/* 
+button::before {
+    content: '\21BB';
+    font-family: 'Arial', sans-serif; 
+    color: white; 
+    margin-right: 5px; 
+    font-size: 50px;
+} */
+
+/* Styles pour le survol du bouton */
+button:hover {
+    background-color:  rgb(10, 0, 130); /* Changement de couleur de fond au survol */
+}
+

@@ -1,0 +1,5 @@
+Table;Reseau;Ligne;Zone;Lieu;pk;Modele;Num;Latitude;Longitude;Date_debut;Date_fin;Ouverture_debut
+x;x;100;x;x;0.0;x;0;0.0;0.0;1900-01-06T00:00:00;1900-01-06T00:00:00;0
+M12_Raccord_Vaugirard_2565;M;12;Raccord;Vaugirard;10.0;Sites1D;2565;48.8390224;2.3;1900-01-06T00:00:00;2030-01-06T00:00:00;0
+M2_Belleville_hh_20183;M;2;Belleville;hh;;Sites1D;20183;48.52226;2.22336;1900-01-06T00:00:00;2030-01-06T00:00:00;0
+M2_dd_1727820000;M;2;dd;dd;10.0;Ginger1D;dd;;;1900-01-06T00:00:00;2030-01-06T00:00:00;0
