@@ -47,9 +47,9 @@ def generate_options_card(data):
     sensors_df = pd.DataFrame(data)
     table_options = sensors_df["Table"]
 
-    #sensors_df["Route"] = sensors_df["Reseau"] + sensors_df["Ligne"].astype(str)
-    #sensors_df["Date_debut"] = pd.to_datetime(sensors_df["Date_debut"], format='mixed', dayfirst=True)
-    #sensors_df["Date_fin"] = pd.to_datetime(sensors_df["Date_fin"], format='mixed', dayfirst=True)
+    # sensors_df["Route"] = sensors_df["Reseau"] + sensors_df["Ligne"].astype(str)
+    # sensors_df["Date_debut"] = pd.to_datetime(sensors_df["Date_debut"], format='mixed', dayfirst=True)
+    # sensors_df["Date_fin"] = pd.to_datetime(sensors_df["Date_fin"], format='mixed', dayfirst=True)
 
     return html.Div(
         id='options-card',
@@ -75,7 +75,7 @@ def generate_options_card(data):
             html.Br(),
             html.H2("capteur"),
             dcc.Dropdown(
-                options=table_options,#sensors_df["Table"],
+                options=table_options,  # sensors_df["Table"],
                 id='dropdown-table',
                 multi=False,
                 style={'minWidth': '200px'}
@@ -102,8 +102,7 @@ def generate_options_card(data):
 
             html.Br(),
             html.Button(
-                id='button_update_fig', disabled=True,
-                style={'background-color': 'rgb(0, 170, 145)'})
+                id='button_update_fig', disabled=True, title='charger les mesures')
 
         ]
     )
@@ -113,27 +112,12 @@ def generate_upload_card():
     return html.Div(
         id="upload-card",
         children=[
-            html.Button('afficher les informations du capteur',
-                        id='button-show-metadata',hidden=True),
-            html.Button('Supprimer un capteur',
-                        id='button-delete-table', hidden=True),
+            # html.Button('Supprimer le capteur',
+            #             id='button-delete-table', hidden=True),
+            # html.Button('modifier les informations du capteur', id='button-update-metadata',hidden=True),
             dcc.Upload(
-                id='upload-file',
+                id='upload-file-dcc',
                 children="Télécharger des mesures",
-                style={
-                    # 'width': '20%',
-                    # 'height': '60px',
-                    'font-size': '10px',
-                    'color': 'rgb(255, 255, 255)',
-                    'background-color': 'rgb(10, 0, 130)',
-                    # 'lineHeight': '50px',
-                    # 'borderWidth': '1px',
-                    # 'borderStyle': 'dashed',
-                    'borderRadius': '50px',
-                    'textAlign': 'center',
-                    'margin': '10px',
-                    'padding': '20px'
-                },
                 multiple=False
             ),
             html.Div(id='upload-card-inner'),
@@ -143,86 +127,104 @@ def generate_upload_card():
 
 
 # boite de dialogue pour specifier le nom du capteur
-#def generate_ingest_children():
+# def generate_ingest_children():
 def generate_form_card():
     return html.Div(id='form-card',
-                    hidden=True,
+                    hidden=False,
                     children=[
-                        html.H5("type de capteur"),
-                        dcc.Textarea(
-                            id='textarea-sensor-model',
-                            readOnly=True,
-                            value=''
-                        ),
-                        html.H5("numero du capteur *"),
-                        dcc.Textarea(
-                            id='textarea-sensor-num',
-                            value=''
-                        ),
+                        html.Div(
+                            id='form-card-column-left', children=[
 
-                        html.H5("zone du capteur *"),
-                        dcc.Textarea(
-                            id='textarea-zone',
-                            value=''
-                        ),
-                        html.H5("précision sur la zone"),
-                        dcc.Textarea(
-                            id='textarea-lieu',
-                            value=''
-                        ),
+                                html.H5("type de capteur"),
+                                dcc.Textarea(
+                                    id='textarea-model',
+                                    disabled=True,
+                                    value=''
+                                ),
+                                html.H5("Date de la pose *"),
+                                dcc.Textarea(
+                                    id='textarea-date-pose',
+                                    value=''
+                                ),
+                                html.H5("Ouverture à la pose"),
+                                dcc.Textarea(
+                                    id='textarea-delta',
+                                    value='0'
+                                ),
+                                html.H5("précision sur la zone"),
+                                dcc.Textarea(
+                                    id='textarea-lieu',
+                                    value=''
+                                ),
 
-                        html.H5("pk de la zone"),
-                        dcc.Textarea(
-                            id='textarea-pk',
-                            value=''
-                        ),
+                                html.H5("Latitude *"),
+                                dcc.Textarea(
+                                    id='textarea-lat',
+                                    value='0'
+                                ),
 
-                        html.H5("Latitude *"),
-                        dcc.Textarea(
-                            id='textarea-lat',
-                            value='0'
-                        ),
-                        html.H5("Longitude *"),
-                        dcc.Textarea(
-                            id='textarea-long',
-                            value='0'
-                        ),
-                        html.H5("Date de la pose *"),
-                        dcc.Textarea(
-                            id='textarea-date-pose',
-                            value=''
-                        ),
-                        html.H5("Date de la dépose"),
-                        dcc.Textarea(
-                            id='textarea-date-depose',
-                            value=''
-                        ),
-                        html.H5("Ouverture à la pose"),
-                        dcc.Textarea(
-                            id='textarea-delta',
-                            value='0'
-                        ),
+                                dcc.Upload(
+                                    id='upload-image-dcc',
+                                    children="télécharger une image",
+                                    multiple=False
+                                ),
+                            ]),
+                        html.Div([
+                            html.H5("numero du capteur *"),
+                            dcc.Textarea(
+                                id='textarea-num',
+                                value=''
+                            ),
+                            html.H5("Date de la dépose"),
+                            dcc.Textarea(
+                                id='textarea-date-depose',
+                                value=''
+                            ),
+                            html.H5("zone du capteur *"),
+                            dcc.Textarea(
+                                id='textarea-zone',
+                                value=''
+                            ),
 
-                        html.Br(),
-                        dcc.Upload(
-                            id='upload-image',
-                            children="télécharger une image",
-                            style={
-                                'font-size': '0.83em',
-                                'color': 'rgb(255, 255, 255)',
-                                'background-color': 'rgb(10, 0, 130)',
-                                'borderWidth': '1px',
-                                'borderStyle': 'dashed',
-                                #'borderRadius': '10px',
-                                'textAlign': 'center',
-                                #'margin': '10px'
-                                'padding': '20px'
-                            },
-                            multiple=False
-                        ),
-                        html.P("", id="text-error-upload-image"),
+                            html.H5("pk de la zone"),
+                            dcc.Textarea(
+                                id='textarea-pk',
+                                value=''
+                            ),
 
+                            html.H5("Longitude *"),
+                            dcc.Textarea(
+                                id='textarea-long',
+                                value='0'
+                            ),
+
+                            html.Br(),
+
+                            html.P("", id="text-error-upload-image"),
+                        ]),
                         dcc.Store(id="store-metadata-to-ingest", data={}),
-
-
                     ])
+
+
+def generate_button_card():
+    return html.Div(
+        id="button-card",
+        children=[
+            html.Button(id='button-ingest', hidden=True, title='intégrer les mesures dans la database'),
+            html.Button(title='Supprimer le capteur',
+                        id='button-delete-table', hidden=True, ),
+            html.Button(title='modifier les informations du capteur', id='button-update-metadata', hidden=True),
+
+        ])
+
+
+def generate_message_card():
+    return html.Div(
+        id="message-card",
+        children=[
+            dcc.Markdown(
+                id='button-card-message',
+                children="## message sur l'execution",
+            ),
+
+        ])

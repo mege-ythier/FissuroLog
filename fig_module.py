@@ -209,14 +209,15 @@ def update_time_series_fig(start_date, end_date, table_name):
     return create_time_series_fig(df_from_sensor_table, table_name)
 
 
-def create_map(sensors_dict):
+def create_map(sensors_data):
     with open("data_ratp/traces-des-lignes-de-transport-en-commun-ratp.geojson", "r") as lines:
         ratp_dict = json.load(lines)
     with open("data_ratp/couleur-ratp-carte.json", 'r') as files:
         color_dict = json.load(files)
 
-    sensors_df = pd.DataFrame(sensors_dict)
+    sensors_df = pd.DataFrame(sensors_data)
     sensors_df["Route"] = sensors_df["Reseau"] + sensors_df["Ligne"].astype(str)
+
     routes_displayed = (sensors_df["Route"]).unique()
 
     fig = go.Figure()
@@ -276,14 +277,14 @@ def create_map(sensors_dict):
                 lat=[sensor["Latitude"]],
                 lon=[sensor["Longitude"]],
                 hoverlabel=dict(bgcolor="pink", namelength=15),
-                hoverinfo='text',
-                hovertext=sensor["Zone"],
-                text=str(sensor["Ligne"]),#.astype(str),
+                # hoverinfo='text',
+                # hovertext=sensor["Zone"],
+                # text=str(sensor["Ligne"]),
                 customdata=[sensor],
-                hovertemplate='Début du suivi: %{customdata[10]}<br>'
+                hovertemplate='Date de la pose: %{customdata[10]}<br>'
                               'Ouverture initiale: %{customdata[12]}<br>'
-                              'Modèle du capteur: %{customdata[6]}<br>'
-                              'Numéros du capteur: %{customdata[7]}<br> ',
+                              'Modèle: %{customdata[6]}<br>'
+                              'Numéros: %{customdata[7]}<br> ',
                 marker=dict(
                     size=10,
                     color='black',

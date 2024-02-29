@@ -1,6 +1,6 @@
 /* Grid
 –––––––––––––––––––––––––––––––––––––––––––––––––– */
-body, h1, h2, h3, h4, h5, p, div {
+body, h1, h2, h3, h4, h5, p,.DateInput_input {
     color : rgb(10, 0, 130);
     margin: 0;
     padding: 0;
@@ -32,7 +32,7 @@ h5 {
 #app-container {
     background-image:url('mur_brique.jpg') ;
     background-size: cover;
-    width: 90%;
+    /* width: 90%; */
     padding: 20px 100px 20px 50px;
     display: block;
     margin: 0px 0px 0px 0px;
@@ -42,9 +42,9 @@ h5 {
 
     .header{
         /*background-color:rgb(243, 170, 227);*/
-        display: inline ;
-        height: 50px;
-        padding: 0px 5px;
+        /* display: inline ; */
+        height: 70px;
+        /* padding: 0px 5px; */
     }
 
     /*last modif column from row*/
@@ -66,14 +66,14 @@ h5 {
         }
 
             #image-card {
-                width: 25%;
+                width: 20%;
                 border: 5px solid rgb(215, 81, 193);
                 margin: 10px 10px 10px 10px;
                 padding: 0px 0px 0px 0px;
             }
 
             #vertical-card {
-                width: 70%;
+                width: 80%;
                 margin: 10px 10px 10px 10px;
                 padding: 0px 0px 0px 0px;
                 border: 5px solid rgb(45, 226, 235)       
@@ -97,7 +97,7 @@ h5 {
 
         #time-series-card {
             width: 100%;
-            margin: 10px 10px 10px 10px;
+            margin: 10px;
             /*background-color:rgb(245, 250, 245);;*/
             border: 5px solid rgb(83, 215, 81);
         }
@@ -106,54 +106,119 @@ h5 {
             border: 5px solid rgb(242, 221, 29);
             display: flex;
             flex-direction: row;
+            height: 80%;
 
         }
         
             #upload-card {
-                background-color: rgba(132, 159, 225, 0.749);
                 border: 5px solid rgb(7, 11, 241);
+                width: 20%;
                 margin: 0px 0px 0px 0px;
                 padding: 0px 0px 0px 0px;
-            }     
+            }
+                #upload-file-dcc, #upload-image-dcc {
+                   
+                    font-size: 0.8em;
+                    font-family:  Arial;
+                    color: rgb(255, 255, 255);
+                    background-color: rgb(10, 0, 130);
+                    line-Height: 1em;
+                    border-Width: 1px;
+                    border-Style: dashed;
+                    /* border-Radius: 50px; */
+                    text-Align: center;
+                    margin: 10px;
+                    padding: 5px
+                }     
 
             #form-card {
     
                 border: 5px solid rgb(242, 29, 228);
                 margin: 0px 0px 0px 0px;
                 padding: 0px 0px 0px 0px;
+                display: flex;
+                flex-direction: row;
              
+                }
 
+                #form-card > div{
+                    border: 5px solid rgb(114, 242, 29);
+                    margin :0px 30px 0px 0px
 
+                                } 
 
-            }     
+            #button-card {
+
+                border: 5px solid rgb(29, 210, 242);
+                width: 6%;
+                margin: 0px 0px 0px 0px;
+                padding: 0px 0px 0px 0px;
+                
+                }
             
-        
-
-
-button {
-
-    padding: 20px 20px; /* Espacement intérieur du bouton */
-    
-    font-size: 10px;   /* Taille de la police */
-    background-color: #879293; /* Couleur de fond */
-    color: white;       /* Couleur du texte */
-    border: 10px;       /* Suppression de la bordure */
-    margin: 10px 10px 10px 10px;
-
-    border-radius: 50px; /* Bordure arrondie */
-    cursor: pointer;    /* Curseur pointeur au survol */
+ #button_update_fig {
+    padding:0px;
+    border: 20px;       /* Suppression de la bordure */
+    background-color:rgb(0, 170, 145);
 }
-/* 
-button::before {
-    content: '\21BB';
-    font-family: 'Arial', sans-serif; 
-    color: white; 
-    margin-right: 5px; 
-    font-size: 50px;
-} */
+
+#button-ingest, #button-delete-table, #button-update-metadata {
+
+    border: 20px;       /* Suppression de la bordure */
+    margin:  20px 10px 20px 10px;
+    background-color:rgb(155,210,200);
+}
+
 
 /* Styles pour le survol du bouton */
 button:hover {
-    background-color:  rgb(10, 0, 130); /* Changement de couleur de fond au survol */
+    cursor: pointer
 }
+
+
+#button-ingest::after{
+    content: '\1F4E4';
+    font-family: 'webdings', sans-serif; 
+    color: white;
+    font-size: 50px;
+    background-color: rgb(223, 133, 182);
+    border-radius: 50px;
+
+}
+#button-delete-table::before {
+    content: '\2702';
+    font-family: 'webdings', sans-serif; 
+    color: white; 
+    margin: 0px;
+    font-size: 50px;
+    background-color: darkorchid;
+    border-radius: 50px;
+    padding: 5px;
+
+ 
+   
+}
+#button-update-metadata::before {
+    content: '\1F5D8';
+    font-family: 'webdings', sans-serif; 
+    color: white;
+    background-color: rgba(237, 244, 21, 0.78);
+    border-radius: 50px;
+    margin: 0px;
+    font-size: 60px;
+ 
+}
+
+#button_update_fig::before {
+    content: '\1F4E5';
+    font-family: 'webdings', sans-serif; 
+    color: white;
+    background-color: rgba(244, 244, 21, 0.78);
+    border-radius: 50px;
+    margin: 0px;
+    font-size: 60px;
+ 
+}
+
+
 

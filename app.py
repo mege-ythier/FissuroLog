@@ -10,7 +10,7 @@ from dash.exceptions import PreventUpdate
 import pandas as pd
 
 from card_module import generate_options_card, generate_map_card, generate_time_series_card, generate_upload_card, fig0, \
-    generate_form_card
+    generate_form_card, generate_button_card, generate_message_card
 from ingest_module import save_in_database
 from ingest_module import parse_file_and_update_ingest_card
 from fig_module import create_time_series_fig, create_map
@@ -20,15 +20,13 @@ server = app.server
 
 # initialisation des données
 sensors_df0 = pd.read_csv("data_capteur/map.csv", sep=";")
-sensors_df0["Date_debut"] = pd.to_datetime(sensors_df0["Date_debut"], format='mixed', dayfirst=True)
-sensors_df0["Date_fin"] = pd.to_datetime(sensors_df0["Date_fin"], format='mixed', dayfirst=True)
 map0 = create_map(sensors_df0.to_dict('records'))
 
 app.layout = html.Div(
     id='app-container',
     children=[
         html.Header(
-            children=[html.Img(src='assets/logo_ratp.png', width='30%', style={'float': 'right'}),
+            children=[html.Img(src='assets/logo_ratp.png', width='20%', style={'float': 'right'}),
                       html.H1("Fissuro logger")
                       ],
             className="header"),
@@ -61,9 +59,10 @@ app.layout = html.Div(
                 html.Div(
                     id='ingest-card',
                     children=[
-                        generate_upload_card(),
+                        generate_button_card(),
                         generate_form_card(),
-                        html.Div(id="button-card")
+                        generate_upload_card(),
+                        generate_message_card()
 
                     ]
                 ),
@@ -114,23 +113,34 @@ def update_line_in_control_card(net_value, selected_data):
     State('store-map-csv', 'data'),
     State('map', 'selectedData'),
     prevent_initial_call=True, interval=10000)
-def update_table_in_control_card(line_value, net_value, dict, selected_data):
-    df = pd.DataFrame(dict)
+def update_table_in_control_card(line_value, net_value, data_sensors, selected_data):
+    df = pd.DataFrame(data_sensors)
     df["Ligne"] = df["Ligne"].astype(str)
 
     if selected_data is None or (selected_data and 'points' in selected_data.keys() and selected_data['points'] == []):
         if len(net_value) > 0 and len(line_value) > 0:
-            return df.loc[(df["Reseau"].isin(net_value)) & (df["Ligne"].isin(line_value)), "Table"].unique(), None
+            table_options = df.loc[(df["Reseau"].isin(net_value)) & (df["Ligne"].isin(line_value)), "Table"].unique()
         elif len(net_value) > 0 and len(line_value) == 0:
-            return df.loc[(df["Reseau"].isin(net_value)), "Table"].unique(), None
+            table_options = df.loc[(df["Reseau"].isin(net_value)), "Table"].unique()
         else:
-            return df["Table"], None
+            table_options =df["Table"]
+        return table_options, None
 
     elif 'points' in selected_data.keys() and selected_data['points'] != []:
+
         raise PreventUpdate
 
     else:
         raise PreventUpdate
+
+@callback(
+    Output('dropdown-table', 'options',allow_duplicate=True),
+    Input('store-map-csv', 'data'),
+    prevent_initial_call=True, interval=10000)
+def update_table_options(data_sensors):
+    df = pd.DataFrame(data_sensors)
+    return df["Table"]
+
 
 
 @callback(Output('dropdown-net', 'value'),
@@ -206,7 +216,8 @@ def encode_image(image_path):
     Output('button_update_fig', 'style', allow_duplicate=True),
     Output('markdown-message', 'children', allow_duplicate=True),
     Output('image-card', 'children'),
-    Output('textarea-sensor-num', "value"),
+    Output('textarea-model', "value"),
+    Output('textarea-num', "value"),
     Output('textarea-zone', "value"),
     Output('textarea-lieu', "value"),
     Output('textarea-pk', "value"),
@@ -214,38 +225,47 @@ def encode_image(image_path):
     Output('textarea-long', "value"),
     Output('textarea-date-pose', "value"),
     Output('textarea-date-depose', "value"),
-    Output('button-show-metadata', 'hidden'),
+    Output('textarea-delta', "value"),
+    Output('button-update-metadata', 'hidden'),
     Output('button-delete-table', 'hidden'),
-    # Output('form-card', 'hidden', allow_duplicate=True),
+    Output('textarea-date-pose', "disabled"),
+    Output('textarea-num', "disabled"),
     Input('button_update_fig', 'n_clicks'),
     Input('dropdown-table', 'value'),
     State('date-picker-select', "start_date"),
     State('date-picker-select', "end_date"),
     State('aggregate-choice', 'value'),
     State('store-map-csv', 'data'),
+    State('textarea-model', "value"),
     prevent_initial_call=True, interval=10000)
-def main_callback(n_clicks, table_name, start_date, end_date, aggregate, data):
+def update_with_table_changed(n_clicks, table_name, start_date, end_date, aggregate, data, model0):
     store = {}
     fig = fig0
     fig_message = "aucune donnée"
     image_card = html.P("")
-    sensor_num, zone, pk, place, lat, long,date_pose,date_depose = "", "", "", "", "", "", "", ""
-    button_show_metadata_is_hidden = True
-    button_delete_table_is_hidden = True
+    # model, num, zone, pk, place, lat, long, date_pose, date_depose, delta = model0, "", "", "", "", "", "", "", "", ""
+    model, num, zone, pk, place, lat, long, date_pose, date_depose, delta = model0, 0, "zone", 0, "place", 0, 0, "01/01/1900", "", 0
+
+    date_pose_disabled, num_disabled = False, False
+    button_update_metadata_is_hidden, button_delete_table_is_hidden = True, True
+
     sensors_df = pd.DataFrame(data)
     sensors_df = sensors_df.set_index("Table")
     if table_name:
-        button_show_metadata_is_hidden = False
+        button_update_metadata_is_hidden = False
         button_delete_table_is_hidden = False
-        sensor_num = sensors_df.loc[table_name, "Num"]
+        date_pose_disabled = True
+        num_disabled = True
+        model = sensors_df.loc[table_name, "Modele"]
+        num = sensors_df.loc[table_name, "Num"]
         zone = sensors_df.loc[table_name, "Zone"]
         place = sensors_df.loc[table_name, "Lieu"]
         lat = sensors_df.loc[table_name, "Latitude"]
         long = sensors_df.loc[table_name, "Longitude"]
-        delta_mm = sensors_df.loc[table_name, "Ouverture_debut"]
         pk = sensors_df.loc[table_name, "pk"]
         date_pose = sensors_df.loc[table_name, "Date_debut"]
         date_depose = sensors_df.loc[table_name, "Date_fin"]
+        delta = sensors_df.loc[table_name, "Ouverture_debut"]
         # if numpy.isnan(pk): pk = ""
 
         start_date_timestamp = datetime.strptime(start_date, "%Y-%m-%d").timestamp()
@@ -274,7 +294,7 @@ def main_callback(n_clicks, table_name, start_date, end_date, aggregate, data):
 
         if size_on_memory <= 200000:
             store = df.to_dict('records')
-            fig = create_time_series_fig(df, table_name, delta_mm)
+            fig = create_time_series_fig(df, table_name, delta)
             fig_message = "données du graphe à jour"
 
         try:
@@ -289,34 +309,33 @@ def main_callback(n_clicks, table_name, start_date, end_date, aggregate, data):
             image_card = html.Img(src=encode_image(image_displayed), width='100%'),
 
     return (store, fig, True, {'background-color': 'rgb(0, 170, 145)'}, fig_message,
-            image_card, str(sensor_num), zone, place, str(pk), str(lat), str(long), str(date_pose), str(date_depose),
-            button_show_metadata_is_hidden, button_delete_table_is_hidden)  # , form_card_is_hidden)
+            image_card, str(model), str(num), zone, place, str(pk), str(lat), str(long), str(date_pose),
+            str(date_depose), str(delta),
+            button_update_metadata_is_hidden, button_delete_table_is_hidden, date_pose_disabled,
+            num_disabled)
 
 
 @callback(
     Output('store-data-uploaded', 'data'),
     Output('upload-card-inner', 'children', allow_duplicate=True),
-    Output('button-card', 'children'),
-    Output('textarea-sensor-model', 'value'),
-    Output('form-card', 'hidden', allow_duplicate=True),
-    Output('markdown-message', 'children', allow_duplicate=True),
-    Input('upload-file', 'contents'),
-    State('upload-file', 'filename'), prevent_initial_call=True, interval=10000)
+    Output('button-ingest', 'hidden'),
+    Output('textarea-model', 'value', allow_duplicate=True),
+    Input('upload-file-dcc', 'contents'),
+    State('upload-file-dcc', 'filename'), prevent_initial_call=True, interval=10000)
 def ingest_first_step(contents, filename):
     return parse_file_and_update_ingest_card(contents, filename)
 
 
 @callback(
-
     Output('confirm-throw-ingestion', 'displayed'),
     Output('confirm-throw-ingestion', 'message'),
     Output('store-metadata-to-ingest', 'data'),
-    Output('markdown-message', 'children', allow_duplicate=True),
+    Output('button-card-message', 'children', allow_duplicate=True),
     Input('button-ingest', 'n_clicks'),
     State('dropdown-table', 'value'),
     State('dropdown-table', 'options'),
-    State('textarea-sensor-model', 'value'),
-    State('textarea-sensor-num', 'value'),
+    State('textarea-model', 'value'),
+    State('textarea-num', 'value'),
     State('dropdown-net', 'value'),
     State('dropdown-line', 'value'),
     State('textarea-zone', 'value'),
@@ -329,64 +348,72 @@ def ingest_first_step(contents, filename):
     prevent_initial_call=True, interval=10000)
 def ingest_middle_step(click, table_select, tables, model, num, net, line, zone, lieu, pk, long, lat, date_pose,
                        date_depose):
+    button_card_message = f""
     if click is None:
         raise PreventUpdate
 
-    elif table_select is not None:
+    elif table_select:
         confirm_message = f"""
         Les données de ton fichier vont étre intégrées au capteur {table_select}.  
-        click ok, pour lancer l'intégration
-        click annuler puis décoche la table dans les options        
+        click ok, pour lancer l'intégration.
+        click annuler, pour changer de capteur.  
+        Dans le bloc du haut, décoche le capteur, choisis la ligne et le réseau, puis relance l'ingestion      
 """
-        return True, confirm_message, {"Table": table_select}, confirm_message
+
+        return True, confirm_message, {"Table": table_select}, button_card_message
 
     elif any(value is None for value in [net, line, zone, model, num, lat, long]):
-        confirm_message = "Des élements ne sont pas renseignés"
-        return False, "", None, confirm_message
+        button_card_message = "Des élements ne sont pas renseignés"
+        return False, "", None, button_card_message
 
     elif any(len(value) == 0 for value in [net, line]):
-        confirm_message = "La ligne ou le réseau ne sont pas renseignés"
-        return False, "", None, confirm_message
+        button_card_message = "La ligne ou le réseau ne sont pas renseignés"
+        return False, "", None, button_card_message
 
     elif not (re.compile(r'^[a-zA-Z]+$').match(zone)):
-        confirm_message = "Le nom de la zone est formé de lettres."
-        return False, "", None, confirm_message
+        button_card_message = "Le nom de la zone est formé de lettres."
+        return False, "", None, button_card_message
     # todo : autoriser les valeurs vides
     elif not (re.compile(r'^[a-zA-Z0-9]+$').match(lieu)):
-        confirm_message = "La précision de la zone comporte uniquement des lettres ou des chiffres."
-        return False, "", None, confirm_message
+        button_card_message = "La précision de la zone comporte uniquement des lettres ou des chiffres."
+        return False, "", None, button_card_message
 
     elif not (re.compile(r'^-?\d*\.?\d*$').match(pk)):
-        confirm_message = f"""Le pk est un chiffre."""
-        return False, "", None, confirm_message
+        button_card_message = f"""Le pk est un chiffre."""
+        return False, "", None, button_card_message
 
     elif not (re.compile(r'^[a-zA-Z0-9]+$').match(num)):
-        confirm_message = "Le numéro du capteur comporte uniquement des lettres ou des chiffres."
-        return False, "", None, confirm_message
+        button_card_message = "Le numéro du capteur comporte uniquement des lettres ou des chiffres."
+        return False, "", None, button_card_message
 
     elif not (re.compile(r'^\d{2}/\d{2}/\d{4}$').match(date_pose)):
-        confirm_message = "Le date de pose est de la forme 01/01/2024."
-        return False, "", None, confirm_message
+        button_card_message = "Le date de pose est de la forme 01/01/2024."
+        return False, "", None, button_card_message
+
+    elif not (re.compile(r'^\d{2}/\d{2}/\d{4}$').match(date_depose) or date_depose == ""):
+        button_card_message = "Le date de dépose est de la forme 01/01/2024."
+        return False, "", None, button_card_message
 
     elif any(len(value) > 1 for value in [net, line]):
-        confirm_message = "Sélectionne une seule ligne!"
-        return False, "", None, confirm_message
+        button_card_message = "Sélectionne une seule ligne!"
+        return False, "", None, button_card_message
 
     else:
         line = line[0]
         net = net[0]
         # a voir
-        #zone_name = "_".join(name for name in [zone, lieu] if name)
+        # zone_name = "_".join(name for name in [zone, lieu] if name)
         # table_created = net + line + "_" + zone_name + "_" + num
-        date_pose = datetime.strptime(date_pose, "%d/%m/%Y")
-        date_pose_str = date_pose.strftime("%Y%m%d")
-        table_created = net + line + "_" + num + "_" + date_pose_str
+        date_pose_yyyymmdd = datetime.strptime(date_pose, "%d/%m/%Y").strftime("%Y%m%d")
+        table_created = net + line + "_" + model + "_" + num + "_" + date_pose_yyyymmdd
 
         if table_created in tables:
             confirm_message = f"""
-            Il y a deja un capteur nommé {table_created} dans le dashboard.
-            Les données de ton fichier vont être intégrées à ce capteur ?
+Il y a deja un capteur nommé {table_created} dans le dashboard.
+Les données de ton fichier vont être intégrées à ce capteur ?
+Sinon, modifies le formulaire :  numero et la date de pose de ton capteur. 
             """
+
 
         else:
             tables_formatted = ""
@@ -396,9 +423,9 @@ def ingest_middle_step(click, table_select, tables, model, num, net, line, zone,
             confirm_message = f"""
 Voici la liste des capteurs existants de la ligne: {tables_formatted}.  
 Les données de ton fichier concernent un nouveau capteur. Ce capteur est nommé {table_created}.  
-Vérifies bien que ton capteur n'existe pas dans la liste.  
-Si oui presses sur ANNULER puis choisis le capteur existant dans le menu déroulant. 
-Si non, presses sur OK pour lancer l'ingestion.
+Vérifies bien que ton capteur n'existe pas dans la liste sous un autre nom.   
+Press OK pour lancer l'ingestion.
+Si ton capteur est deja intégré dans l'application, sélectionne le dans le menu déroulant du bloc du haut.
 """
 
         metadata = {'Reseau': net, 'Ligne': line, 'Zone': zone, 'Lieu': lieu, 'pk': pk, 'Modele': model,
@@ -406,11 +433,11 @@ Si non, presses sur OK pour lancer l'ingestion.
                     'Latitude': lat, 'Longitude': long, 'Date_debut': date_pose, 'Date_fin': date_depose,
                     'Ouverture_debut': 0, 'Table': table_created}
 
-        return True, confirm_message, metadata, confirm_message
+        return True, confirm_message, metadata, button_card_message
 
 
 @callback(Output('text-error-upload-image', 'children'),
-          Input('upload-image', 'contents'),
+          Input('upload-image-dcc', 'contents'),
           )
 def show_message_upload_image(contents):
     try:
@@ -428,28 +455,27 @@ def show_message_upload_image(contents):
 
 
 @callback(
-    Output('markdown-message', 'children'),
+
     Output('store-map-csv', 'data'),
-    Output('form-card', 'hidden'),
-    Output('ingest-card', 'children'),
+    Output('button-card-message', 'children', allow_duplicate=True),
+    Output('upload-file-dcc', 'contents'),
+    Output('dropdown-table', 'value', allow_duplicate=True),
     Input('confirm-throw-ingestion', 'submit_n_clicks'),
     State('store-data-uploaded', 'data'),
     State('store-map-csv', 'data'),
     State('store-metadata-to-ingest', 'data'),
-    State('upload-image', 'contents'),
+    State('upload-image-dcc', 'contents'),
     Prevent_initial_call=True, interval=10000, prevent_initial_call='initial_duplicate')
 def ingest_final_step(click, data, all_metadata, metadata, image_contents):
     image_upload_info = ["aucune image uploadée"]
     # quand on lance l'appli le submit_n_clicks de confirm-throw-ingestion prend la valeur None et donc il y a un call
-    # if any(value is None for value in [click, data, metadata]):
-    #     raise PreventUpdate()
-    if click is None: raise PreventUpdate
+    if click is None:
+        raise PreventUpdate
+    elif metadata == {}:
+        raise PreventUpdate
     else:
-
         table_name = metadata["Table"]
-        # todo: est ce qu'on garde la route dans le nom de la table?
         route = table_name.split("_")[0]
-
         df = pd.DataFrame(data)
 
         # extraire la liste des capteurs de la route avant l'ingestion
@@ -481,8 +507,8 @@ def ingest_final_step(click, data, all_metadata, metadata, image_contents):
 
         database_info = (
                 [f""" ### Information sur l'ingestion.
-    {table_length} mesures sont associées au capteur {table_name}.  
-    La liste des capteurs de la ligne {route} est :"""] + [f"- {table}\n" for table in tables_name]
+{table_length} mesures sont associées au capteur {table_name}.  
+La liste des capteurs de la ligne {route} est :"""] + [f"- {table}\n" for table in tables_name]
         )
 
         try:
@@ -505,27 +531,13 @@ def ingest_final_step(click, data, all_metadata, metadata, image_contents):
                 f.write(decoded)
             image_upload_info = ["succes de l'intégration de l'image"]
 
-        return database_info + image_upload_info, all_metadata, False, [generate_upload_card(), generate_form_card(),
-                                                                        html.Div(id="button-card")]
-
-
-@callback(Output('form-card', 'hidden', allow_duplicate=True),
-          Output('button-card', 'children', allow_duplicate=True),
-          Output('upload-card-inner', 'children', allow_duplicate=True),
-          Output('markdown-message', 'children', allow_duplicate=True),
-          Input('button-show-metadata', 'n_clicks'),
-          Prevent_initial_call=True, interval=10000, prevent_initial_call='initial_duplicate')
-def show_form_card(click):
-    if click is None: raise PreventUpdate
-    return (False,
-            html.Button('modifier les informations du capteur', id='button-update-metadata'),
-            html.Div(""),
-            "Tu peux changer les valeurs d'un capteur existant")
+        return all_metadata, database_info + image_upload_info, None, table_name
 
 
 @callback(
-    Output('markdown-message', 'children', allow_duplicate=True),
+
     Output('store-map-csv', 'data', allow_duplicate=True),
+    Output('button-card-message', 'children', allow_duplicate=True),
     Input('button-update-metadata', 'n_clicks'),
     State('store-map-csv', 'data'),
     State('dropdown-table', 'value'),
@@ -533,7 +545,7 @@ def show_form_card(click):
     State('textarea-long', 'value'),
     State('textarea-pk', 'value'),
     State('textarea-delta', 'value'),
-    State('upload-image', 'contents'),
+    State('upload-image-dcc', 'contents'),
     Prevent_initial_call=True, interval=10000, prevent_initial_call='initial_duplicate'
     # Prevent_initial_call=True, interval=10000
 )
@@ -585,13 +597,12 @@ def update_sensors_info(click, sensors_data_stored, table_name, lat, long, pk, d
                 f.write(decoded)
             message = "information du capteur mis a jour et ingestion d'une nouvelle image"
 
-        return message, sensors_data_stored
+        return  sensors_data_stored, message
 
 
 @callback(
     Output('confirm-delete-table', 'displayed'),
     Output('confirm-delete-table', 'message'),
-    #Output('store-map-csv', 'data',allow_duplicate=True),
     Input('button-delete-table', 'n_clicks'),
     State('dropdown-table', 'value'),
     State('store-map-csv', 'data'),
@@ -601,28 +612,31 @@ def delete_table_first_step(click, table_select, sensors_data):
         raise PreventUpdate
     elif table_select is None:
         raise PreventUpdate
-    else :
+    else:
         confirm_message = f"""
     Les données du capteurs {table_select} vont être supprimer.         
 """
         return True, confirm_message
 
+
 @callback(
     # Output('confirm-delete-table', 'message'),
-    Output('store-map-csv', 'data',allow_duplicate=True),
+    Output('store-map-csv', 'data', allow_duplicate=True),
+    Output('button-card-message', 'children', allow_duplicate=True),
+    Output('dropdown-table','value',allow_duplicate=True),
     Input('confirm-delete-table', 'submit_n_clicks'),
     State('dropdown-table', 'value'),
     State('store-map-csv', 'data'),
     prevent_initial_call=True, interval=10000)
-def delete_table_final_step(click,  table_select, sensors_data):
+def delete_table_final_step(click, table_select, sensors_data):
     if click is None:
         raise PreventUpdate
     elif table_select is None:
         raise PreventUpdate
     else:
         sensors_df = pd.DataFrame(sensors_data)
-        sensors_df.set_index("Table",inplace=True)
-        sensors_df.drop(table_select,inplace=True, axis=0)
+        sensors_df.set_index("Table", inplace=True)
+        sensors_df.drop(table_select, inplace=True, axis=0)
         sensors_df.reset_index(inplace=True)
 
         conn = sqlite3.connect('data_capteur/database.db')
@@ -630,18 +644,35 @@ def delete_table_final_step(click,  table_select, sensors_data):
         cursor.execute(f"""DROP TABLE IF EXISTS {table_select} """)
         conn.commit()
 
+        return sensors_df.to_dict('records'), f'capteur {table_select} supprimé', None
 
 
-        return sensors_df.to_dict('records')
+# @callback(
+#     Output('form-card', 'hidden'),
+#     Input('button-show-metadata', 'n_clicks'),
+#     Input('confirm-throw-ingestion', 'submit_n_clicks'),
+#     Input('upload-file-dcc', 'contents'),
+#     Input('button-delete-table', 'n_clicks'),
+#     prevent_initial_call=True)
+# def update_form_card_visibility(click_show_metadata, click_throw_ingestion, click_upload_file,click_delete_table):
+#     if click_show_metadata:
+#         return False
+#     if click_throw_ingestion:
+#         return True
+#     if click_upload_file:
+#         return False
+#     if click_delete_table: return True
 
 
 @callback(Output('map', 'figure'),
-          Input('store-map-csv', 'data'))
-def update_map(sensors_dict):
+          Input('store-map-csv', 'data'),
+          )
+def update_map(sensors_data):
     print("update map store")
-    sensors_df = pd.DataFrame(sensors_dict)
+    sensors_df = pd.DataFrame(sensors_data)
+    # sensors_df['Date_debut'] = pd.to_datetime(sensors_df['Date_debut'], format='%d-%m-%Y')
     sensors_df.to_csv("data_capteur/map.csv", index=False, sep=";", header=True, mode="w")
-    return create_map(sensors_dict)
+    return create_map(sensors_data)
 
 
 if __name__ == '__main__':
