@@ -52,7 +52,7 @@ def generate_options_card(data):
             dcc.Store(id='store-time-serie'),
             html.H2("Réseau"),
             dcc.Dropdown(
-                options=pd.Series(["RER", "M", "T"]),
+                options=pd.Series(["RER", "METRO", "TRAM"]),
                 id='dropdown-net',
                 value=[],
                 multi=True,

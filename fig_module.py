@@ -210,13 +210,13 @@ def update_time_series_fig(start_date, end_date, table_name):
 
 
 def create_map(sensors_data):
-    with open("data_ratp/traces-des-lignes-de-transport-en-commun-ratp.geojson", "r") as lines:
+    with open("data_ratp/traces-du-reseau-de-transport-ferre-ratp.geojson", "r") as lines:
         ratp_dict = json.load(lines)
     with open("data_ratp/couleur-ratp-carte.json", 'r') as files:
         color_dict = json.load(files)
 
     sensors_df = pd.DataFrame(sensors_data)
-    sensors_df["Route"] = sensors_df["Reseau"] + sensors_df["Ligne"].astype(str)
+    sensors_df["Route"] = sensors_df["Reseau"] +" "+sensors_df["Ligne"].astype(str)
 
     routes_displayed = (sensors_df["Route"]).unique()
 
@@ -239,33 +239,33 @@ def create_map(sensors_data):
     # dessiner les lignes
     routes_drawn = []
     for feature in ratp_dict['features']:
-        coordinates = feature['geometry']['coordinates'][0]
-        line = feature['properties']['route_short_name']
-        net = feature['properties']['route_type_symbol']
-        route = net + line
-        lon, lat = zip(*coordinates)
-        fig.add_trace(
-            go.Scattermapbox(
-                mode="lines",
-                lon=lon,
-                lat=lat,
-                line=dict(width=3, color=color_dict[line]),
-                name=route,
-                hoverinfo='text',
-                hovertext=route,
-                showlegend=False,
-                customdata=[route] * len(lon),
-                legendgroup=route,
-                visible='legendonly',
+        geometry = feature.get('geometry')
+        if geometry:
+            route = feature['properties']['res_com']
+            coordinates = feature['geometry']['coordinates']
+            for i in range(len(coordinates)):
+                lon, lat = zip(*coordinates[i])
+                fig.add_trace(
+                    go.Scattermapbox(
+                        mode="lines",
+                        lon=lon,
+                        lat=lat,
+                        line=dict(width=3, color=color_dict[route]),
+                        name=route,
+                        hoverinfo='text',
+                        hovertext=route,
+                        showlegend=False,
+                        customdata=[route] * len(lon),
+                        legendgroup=route,
+                        visible='legendonly',
+                    )
+                )
+                if route in routes_displayed:
+                    fig.update_traces(selector=dict(name=route), patch=dict(visible=True))
 
-            )
-        )
-        if route in routes_displayed:
-            fig.update_traces(selector=dict(name=route), patch=dict(visible=True))
-
-        if route not in routes_drawn:
-            fig.update_traces(selector=dict(name=route), patch=dict(showlegend=True))
-        routes_drawn.append(route)
+                if route not in routes_drawn:
+                    fig.update_traces(selector=dict(name=route), patch=dict(showlegend=True))
+                routes_drawn.append(route)
 
     # dessiner les capteurs
     for i in range(sensors_df.shape[0]):

@@ -15,7 +15,8 @@ from ingest_module import save_in_database
 from ingest_module import parse_file_and_update_ingest_card
 from fig_module import create_time_series_fig, create_map
 
-app = Dash(__name__, suppress_callback_exceptions=True, prevent_initial_callbacks=True)
+# app = Dash(__name__, suppress_callback_exceptions=True, prevent_initial_callbacks=True)
+app = Dash(__name__, prevent_initial_callbacks=True)
 server = app.server
 
 # initialisation des données
@@ -53,8 +54,6 @@ app.layout = html.Div(
                     children="## Bienvenue",
                 ),
                 generate_time_series_card(),
-
-
 
                 html.Div(
                     id='ingest-card',
@@ -94,9 +93,9 @@ def update_line_in_control_card(net_value, selected_data):
     line_options = []
     if "RER" in net_value:
         line_options += ["A", "B"]
-    if "M" in net_value:
+    if "METRO" in net_value:
         line_options += ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14"]
-    if "T" in net_value:
+    if "TRAM" in net_value:
         line_options += ["1", "2", "3,""4", "5", "6", "7", "8", "9", "10"]
 
     if selected_data is None or (selected_data and 'points' in selected_data.keys() and selected_data['points'] == []):
@@ -123,7 +122,7 @@ def update_table_in_control_card(line_value, net_value, data_sensors, selected_d
         elif len(net_value) > 0 and len(line_value) == 0:
             table_options = df.loc[(df["Reseau"].isin(net_value)), "Table"].unique()
         else:
-            table_options =df["Table"]
+            table_options = df["Table"]
         return table_options, None
 
     elif 'points' in selected_data.keys() and selected_data['points'] != []:
@@ -133,14 +132,14 @@ def update_table_in_control_card(line_value, net_value, data_sensors, selected_d
     else:
         raise PreventUpdate
 
+
 @callback(
-    Output('dropdown-table', 'options',allow_duplicate=True),
+    Output('dropdown-table', 'options', allow_duplicate=True),
     Input('store-map-csv', 'data'),
     prevent_initial_call=True, interval=10000)
 def update_table_options(data_sensors):
     df = pd.DataFrame(data_sensors)
     return df["Table"]
-
 
 
 @callback(Output('dropdown-net', 'value'),
@@ -149,20 +148,16 @@ def update_table_options(data_sensors):
           prevent_initial_call=True, interval=10000
           )
 def update_control_card_with_click_on_line_map(click_data):
-    custom_data = click_data['points'][0]['customdata']
+    route = click_data['points'][0]['customdata']
     net_click_value = None
     line_click_value = None
     # click sur la ligne
-    if type(custom_data) == str:
-        if custom_data[0] == "R":
-            net_click_value = ["RER"]
-            line_click_value = [custom_data[3:]]
-        else:
-            net_click_value = [custom_data[0]]
-            line_click_value = [custom_data[1:]]
-    if type(custom_data) == list:
+    if type(route) == str:
+        net_click_value = route.split(" ")[0]
+        line_click_value = route.split(" ")[1]
+    if type(route) == list:
         raise PreventUpdate
-    return net_click_value, line_click_value
+    return [net_click_value], [line_click_value]
 
 
 @callback(Output('dropdown-net', 'value', allow_duplicate=True),
@@ -402,7 +397,8 @@ def ingest_middle_step(click, table_select, tables, model, num, net, line, zone,
         line = line[0]
         net = net[0]
         date_pose_yyyymmdd = datetime.strptime(date_pose, "%d/%m/%Y").strftime("%Y%m%d")
-        table_created = net + line + "_" + model + "_" + num + "_" + date_pose_yyyymmdd
+        net_dict = {"RER": "RER", "METRO": "M", "TRAM": "T"}
+        table_created = net_dict[net] + line + "_" + model + "_" + num + "_" + date_pose_yyyymmdd
 
         if table_created in tables:
             confirm_message = f"""
@@ -411,9 +407,11 @@ Les données de ton fichier vont être intégrées à ce capteur.
 Press OK pour lancer l'ingestion.  
             """
         else:
+            # todo: gere l'erreur la table se crée mais pas la ligne dans le csv
             confirm_message = f"""
-Les données de ton fichier concernent un nouveau capteur. Ce capteur est nommé {table_created}.  
-Vérifies bien que ton capteur n'existe sous un autre nom.     
+Les données de ton fichier concernent un nouveau capteur.
+Ce capteur s'appelera {table_created}.  
+Vérifies bien que ton capteur n'existe pas sous un autre nom.     
 Press OK pour lancer l'ingestion.
 """
 
@@ -496,7 +494,7 @@ def ingest_final_step(click, data, all_metadata, metadata, image_contents):
 
         database_info = (
                 [f""" ### Information sur l'ingestion.
-{table_length} mesures sont associées au capteur {table_name}.  
+Le capteur {table_name} a mesuré {table_length} ouvertures  .  
 La liste des capteurs de la ligne {route} est :"""] + [f"- {table}\n" for table in tables_name]
         )
 
@@ -520,7 +518,7 @@ La liste des capteurs de la ligne {route} est :"""] + [f"- {table}\n" for table 
                 f.write(decoded)
             image_upload_info = ["succes de l'intégration de l'image"]
 
-        #return all_metadata, database_info + image_upload_info, None, table_name
+        # return all_metadata, database_info + image_upload_info, None, table_name
         return all_metadata, database_info + image_upload_info, table_name
 
 
@@ -587,7 +585,7 @@ def update_sensors_info(click, sensors_data_stored, table_name, lat, long, pk, d
                 f.write(decoded)
             message = "information du capteur mis a jour et ingestion d'une nouvelle image"
 
-        return  sensors_data_stored, message
+        return sensors_data_stored, message
 
 
 @callback(
@@ -613,7 +611,7 @@ def delete_table_first_step(click, table_select, sensors_data):
     # Output('confirm-delete-table', 'message'),
     Output('store-map-csv', 'data', allow_duplicate=True),
     Output('ingest-card-message', 'children', allow_duplicate=True),
-    Output('dropdown-table','value',allow_duplicate=True),
+    Output('dropdown-table', 'value', allow_duplicate=True),
     Input('confirm-delete-table', 'submit_n_clicks'),
     State('dropdown-table', 'value'),
     State('store-map-csv', 'data'),
