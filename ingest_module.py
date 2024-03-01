@@ -14,18 +14,7 @@ def parse_file_and_update_ingest_card(contents, filename):
     provider = ""
     df = pd.DataFrame({})
     if contents is None:
-        return (
-            # store-data-uploaded
-            {},
-            # upload-card-inner
-            html.Div(),
-            # button-card
-            True,
-            # 'textarea-sensor-model'
-            f"",
-  )
-
-        # raise PreventUpdate
+        raise PreventUpdate
 
     else:
         content_type, content_string = contents.split(',')
@@ -95,29 +84,27 @@ def parse_file_and_update_ingest_card(contents, filename):
 
         except Exception as e:
             return (
-                {},
+                {},  # store-data-uploaded'
+                # upload-card-inner
                 html.Div(id='upload-card', children=[
                     html.H5("Information sur le fichier téléchargé"),
                     dcc.Markdown(children=f'{e} , Contactes Amandine'),
                     DataTable(data=df.to_dict('records'), page_size=10),
                 ]),
-                False,
-                f"inconnu",
-                "erreur"
+
+                False,  # button-ingest
+                f"inconnu",  # textarea-model
+                "erreur dans le parsing",  # ingest-card-message
             )
+
 
         else:
             return (
-                df.drop("Date", axis=1).to_dict('records'),
+                df.drop("Date", axis=1).to_dict('records'),  # store-data-uploaded'
                 # upload-card-inner
                 html.Div([
                     html.H3("Information sur le fichier téléchargé"),
-                    dcc.Markdown(
-                        children=
-                        f"""
-                    Ton fichier {filename} contient la table suivante.
-                    """
-                    ),
+                    html.P(f"Ton fichier {filename} contient la table suivante."),
                     DataTable(
                         data=df.drop("unix", axis=1).to_dict('records'),
                         columns=[{'name': i, 'id': i} for i in df.drop("unix", axis=1).columns],
@@ -125,11 +112,9 @@ def parse_file_and_update_ingest_card(contents, filename):
                     ),
 
                 ]),
-                # button-card
-                False,
-                # 'textarea-sensor-model'
-                f"{provider}",
-
+                False,  # button-card
+                f"{provider}",  # textarea-sensor-model
+                "",  # ingest-card-message
 
             )
 

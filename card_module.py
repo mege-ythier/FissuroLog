@@ -45,11 +45,6 @@ def generate_map_card(fig):
 
 def generate_options_card(data):
     sensors_df = pd.DataFrame(data)
-    table_options = sensors_df["Table"]
-
-    # sensors_df["Route"] = sensors_df["Reseau"] + sensors_df["Ligne"].astype(str)
-    # sensors_df["Date_debut"] = pd.to_datetime(sensors_df["Date_debut"], format='mixed', dayfirst=True)
-    # sensors_df["Date_fin"] = pd.to_datetime(sensors_df["Date_fin"], format='mixed', dayfirst=True)
 
     return html.Div(
         id='options-card',
@@ -65,9 +60,8 @@ def generate_options_card(data):
             ),
             html.H2("ligne"),
             dcc.Dropdown(
-                # options=pd.Series(monitored_lines).unique(),#last
                 options=all_lines,
-                value=[],  # last
+                value=[],
                 id='dropdown-line',
                 multi=True,
                 style={'minWidth': '100px'}
@@ -75,7 +69,7 @@ def generate_options_card(data):
             html.Br(),
             html.H2("capteur"),
             dcc.Dropdown(
-                options=table_options,  # sensors_df["Table"],
+                options=sensors_df["Table"],
                 id='dropdown-table',
                 multi=False,
                 style={'minWidth': '200px'}
@@ -112,9 +106,6 @@ def generate_upload_card():
     return html.Div(
         id="upload-card",
         children=[
-            # html.Button('Supprimer le capteur',
-            #             id='button-delete-table', hidden=True),
-            # html.Button('modifier les informations du capteur', id='button-update-metadata',hidden=True),
             dcc.Upload(
                 id='upload-file-dcc',
                 children="Télécharger des mesures",
@@ -122,12 +113,11 @@ def generate_upload_card():
             ),
             html.Div(id='upload-card-inner'),
             dcc.Store(id='store-data-uploaded'),
-
         ])
 
 
 # boite de dialogue pour specifier le nom du capteur
-# def generate_ingest_children():
+
 def generate_form_card():
     return html.Div(id='form-card',
                     hidden=False,
@@ -149,7 +139,7 @@ def generate_form_card():
                                 html.H5("Ouverture à la pose"),
                                 dcc.Textarea(
                                     id='textarea-delta',
-                                    value='0'
+                                    value=''
                                 ),
                                 html.H5("précision sur la zone"),
                                 dcc.Textarea(
@@ -160,7 +150,7 @@ def generate_form_card():
                                 html.H5("Latitude *"),
                                 dcc.Textarea(
                                     id='textarea-lat',
-                                    value='0'
+                                    value=''
                                 ),
 
                                 dcc.Upload(
@@ -186,7 +176,7 @@ def generate_form_card():
                                 value=''
                             ),
 
-                            html.H5("pk de la zone"),
+                            html.H5("pk de la zone*"),
                             dcc.Textarea(
                                 id='textarea-pk',
                                 value=''
@@ -195,7 +185,7 @@ def generate_form_card():
                             html.H5("Longitude *"),
                             dcc.Textarea(
                                 id='textarea-long',
-                                value='0'
+                                value=''
                             ),
 
                             html.Br(),
@@ -223,8 +213,8 @@ def generate_message_card():
         id="message-card",
         children=[
             dcc.Markdown(
-                id='button-card-message',
-                children="## message sur l'execution",
+                id='ingest-card-message',
+                children="## ",
             ),
 
         ])
