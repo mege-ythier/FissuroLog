@@ -88,7 +88,7 @@ def parse_file_and_update_ingest_card(contents, filename):
                 # upload-card-inner
                 html.Div(id='upload-card', children=[
                     html.H5("Information sur le fichier téléchargé"),
-                    dcc.Markdown(children=f'{e} , Contactes Amandine'),
+                    dcc.Markdown(children=f'{e} , Contactes amandine.mege-ythier@ratp.fr'),
                     DataTable(data=df.to_dict('records'), page_size=10),
                 ]),
 
@@ -104,7 +104,7 @@ def parse_file_and_update_ingest_card(contents, filename):
                 # upload-card-inner
                 html.Div([
                     html.H3("Information sur le fichier téléchargé"),
-                    html.P(f"Ton fichier {filename} contient la table suivante."),
+                    html.H4(f"Le fichier {filename} contient la table suivante."),
                     DataTable(
                         data=df.drop("unix", axis=1).to_dict('records'),
                         columns=[{'name': i, 'id': i} for i in df.drop("unix", axis=1).columns],
@@ -123,8 +123,6 @@ def save_in_database(df, sensor_table):
     # Create sqlite database and cursor
     conn = sqlite3.connect('data_capteur/database.db')
     cursor = conn.cursor()
-
-    # sensor_table = zone + "_" + sensor_model + "_" + sensor_num
     cursor.execute(f"""CREATE TABLE IF NOT EXISTS {sensor_table} (
                         mm real,
                         °C real,

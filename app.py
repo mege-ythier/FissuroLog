@@ -15,7 +15,6 @@ from ingest_module import save_in_database
 from ingest_module import parse_file_and_update_ingest_card
 from fig_module import create_time_series_fig, create_map
 
-# app = Dash(__name__, suppress_callback_exceptions=True, prevent_initial_callbacks=True)
 app = Dash(__name__, prevent_initial_callbacks=True)
 server = app.server
 
@@ -41,18 +40,18 @@ app.layout = html.Div(
                 html.Div(
                     id='select-data-card', children=[
                         html.Div(
+                            id='button_update_fig_card', children= html.Button(id='button_update_fig', hidden=True, title='charger les mesures')),
+                        html.Div(
                             id='vertical-card',
                             children=[
                                 generate_options_card(sensors_df0.to_dict("records")),
                                 generate_map_card(map0),
+                                html.H3(id='fig-message', children="click sur la carte"),
                             ]
                         ),
                         html.Div(id='image-card')]
                 ),
-                dcc.Markdown(
-                    id='markdown-message',
-                    children="## Bienvenue",
-                ),
+
                 generate_time_series_card(),
 
                 html.Div(
@@ -179,8 +178,8 @@ def update_control_card_with_click_on_point_map(click_data):
         raise PreventUpdate
 
 
-@callback(Output('button_update_fig', 'disabled'),
-          Output('markdown-message', 'children', allow_duplicate=True),
+@callback(Output('button_update_fig', 'hidden'),
+          Output('fig-message', 'children', allow_duplicate=True),
           Input('date-picker-select', "start_date"),
           Input('date-picker-select', "end_date"),
           Input('aggregate-choice', 'value'),
@@ -206,9 +205,8 @@ def encode_image(image_path):
 @callback(
     Output('store-time-serie', 'data'),
     Output('graph-time-series', 'figure'),
-    Output('button_update_fig', 'disabled', allow_duplicate=True),
-    Output('button_update_fig', 'style', allow_duplicate=True),
-    Output('markdown-message', 'children', allow_duplicate=True),
+    Output('button_update_fig', 'hidden', allow_duplicate=True),
+    Output('fig-message', 'children', allow_duplicate=True),
     Output('image-card', 'children'),
     Output('textarea-model', "value"),
     Output('textarea-num', "value"),
@@ -236,10 +234,8 @@ def update_with_table_changed(n_clicks, table_name, start_date, end_date, aggreg
     store = {}
     fig = fig0
     fig_message = "aucune donnée"
-    image_card = html.P("")
-    # model, num, zone, pk, place, lat, long, date_pose, date_depose, delta = model0, "", "", "", "", "", "", "", "", ""
-    model, num, zone, pk, place, lat, long, date_pose, date_depose, delta = model0, 0, "zone", 0, "place", 0, 0, "01/01/1900", "", 0
-
+    image_card = html.H3("")
+    model, num, zone, pk, place, lat, long, date_pose, date_depose, delta = model0, "", "", "", "", "", "", "", "", ""
     date_pose_disabled, num_disabled = False, False
     button_update_metadata_is_hidden, button_delete_table_is_hidden = True, True
 
@@ -298,11 +294,11 @@ def update_with_table_changed(n_clicks, table_name, start_date, end_date, aggreg
             image_displayed = f'{images_path}{max(images_number)}.png'
 
         except FileNotFoundError:
-            image_card = html.P("il n'y a pas encore d'image du capteur dans les données du dashboard"),
+            image_card = html.H3("il n'y a pas encore d'image du capteur dans les données du dashboard"),
         else:
             image_card = html.Img(src=encode_image(image_displayed), width='100%'),
 
-    return (store, fig, True, {'background-color': 'rgb(0, 170, 145)'}, fig_message,
+    return (store, fig, True, fig_message,
             image_card, str(model), str(num), zone, place, str(pk), str(lat), str(long), str(date_pose),
             str(date_depose), str(delta),
             button_update_metadata_is_hidden, button_delete_table_is_hidden, date_pose_disabled,
@@ -343,7 +339,7 @@ def ingest_first_step(contents, filename):
     prevent_initial_call=True, interval=10000)
 def ingest_middle_step(click, table_select, tables, model, num, net, line, zone, lieu, pk, long, lat, date_pose,
                        date_depose):
-    button_card_message = f""
+    ingest_card_message = f""
     if click is None:
         raise PreventUpdate
 
@@ -355,43 +351,43 @@ def ingest_middle_step(click, table_select, tables, model, num, net, line, zone,
         click annuler, pour arrêter l'ingestion, puis choisis ou crée le bon capteur.      
 """
 
-        return True, confirm_message, {"Table": table_select}, button_card_message
+        return True, confirm_message, {"Table": table_select}, ingest_card_message
 
     elif any(value is None for value in [net, line, zone, model, num, lat, long]):
-        button_card_message = "Des élements ne sont pas renseignés"
-        return False, "", None, button_card_message
+        ingest_card_message = "Des élements ne sont pas renseignés"
+        return False, "", None, ingest_card_message
 
     elif any(len(value) == 0 for value in [net, line]):
-        button_card_message = "La ligne ou le réseau ne sont pas renseignés"
-        return False, "", None, button_card_message
+        ingest_card_message = "La ligne ou le réseau ne sont pas renseignés"
+        return False, "", None, ingest_card_message
 
     elif not (re.compile(r'^[a-zA-Z]+$').match(zone)):
-        button_card_message = "Le nom de la zone est formé de lettres."
-        return False, "", None, button_card_message
+        ingest_card_message = "Le nom de la zone est formé de lettres."
+        return False, "", None, ingest_card_message
     # todo : autoriser les valeurs vides
     elif not (re.compile(r'^[a-zA-Z0-9]+$').match(lieu)):
-        button_card_message = "La précision de la zone comporte uniquement des lettres ou des chiffres."
-        return False, "", None, button_card_message
+        ingest_card_message = "La précision de la zone comporte uniquement des lettres ou des chiffres."
+        return False, "", None, ingest_card_message
 
     elif not (re.compile(r'^-?\d*\.?\d*$').match(pk)):
-        button_card_message = f"""Le pk est un chiffre."""
-        return False, "", None, button_card_message
+        ingest_card_message = f"""Le pk est un chiffre."""
+        return False, "", None, ingest_card_message
 
     elif not (re.compile(r'^[a-zA-Z0-9]+$').match(num)):
-        button_card_message = "Le numéro du capteur comporte uniquement des lettres ou des chiffres."
-        return False, "", None, button_card_message
+        ingest_card_message = "Le numéro du capteur comporte uniquement des lettres ou des chiffres."
+        return False, "", None, ingest_card_message
 
     elif not (re.compile(r'^\d{2}/\d{2}/\d{4}$').match(date_pose)):
-        button_card_message = "Le date de pose est de la forme 01/01/2024."
-        return False, "", None, button_card_message
+        ingest_card_message = "Le date de pose est de la forme 01/01/2024."
+        return False, "", None, ingest_card_message
 
     elif not (re.compile(r'^\d{2}/\d{2}/\d{4}$').match(date_depose) or date_depose == ""):
-        button_card_message = "Le date de dépose est de la forme 01/01/2024."
-        return False, "", None, button_card_message
+        ingest_card_message = "Le date de dépose est de la forme 01/01/2024."
+        return False, "", None, ingest_card_message
 
     elif any(len(value) > 1 for value in [net, line]):
-        button_card_message = "Sélectionne une seule ligne!"
-        return False, "", None, button_card_message
+        ingest_card_message = "Sélectionne une seule ligne!"
+        return False, "", None, ingest_card_message
 
     else:
         line = line[0]
@@ -420,7 +416,7 @@ Press OK pour lancer l'ingestion.
                     'Latitude': lat, 'Longitude': long, 'Date_pose': date_pose, 'Date_depose': date_depose,
                     'Ouverture_pose': 0, 'Table': table_created}
 
-        return True, confirm_message, metadata, button_card_message
+        return True, confirm_message, metadata, ingest_card_message
 
 
 @callback(Output('text-error-upload-image', 'children'),
@@ -608,7 +604,6 @@ def delete_table_first_step(click, table_select, sensors_data):
 
 
 @callback(
-    # Output('confirm-delete-table', 'message'),
     Output('store-map-csv', 'data', allow_duplicate=True),
     Output('ingest-card-message', 'children', allow_duplicate=True),
     Output('dropdown-table', 'value', allow_duplicate=True),

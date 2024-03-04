@@ -1,8 +1,2 @@
 Table;Reseau;Ligne;Zone;Lieu;pk;Modele;Num;Latitude;Longitude;Date_pose;Date_depose;Ouverture_pose
 M12_Sites1D_2565_20220224;METRO;12;raccord;raccord;0;Sites1D;2565;48.8390224;2.3001811;24/02/2022;;-4
-M2_Sites1D_1_19000101;METRO;2;zone;place;0;Sites1D;1;0;0;01/01/1900;;0
-M12_Sites1D_3_19000101;METRO;12;zone;place;0;Sites1D;3;0;0;01/01/1900;;0
-M13_Sites1D_0_19000101;METRO;13;zone;place;0;Sites1D;0;0;0;01/01/1900;;0
-M2_Sites1D_2_19000101;METRO;2;zone;place;0;Sites1D;2;0;0;01/01/1900;;0
-T1_Sites1D_0_19000101;TRAM;1;zone;place;0;Sites1D;0;0;0;01/01/1900;;0
-T5_Sites1D_0_19000101;TRAM;5;zone;place;0;Sites1D;0;0;0;01/01/1900;;0

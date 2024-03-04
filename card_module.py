@@ -6,12 +6,16 @@ from dateutil.relativedelta import relativedelta
 from datetime import datetime
 import json
 
-with open("data_ratp/traces-des-lignes-de-transport-en-commun-ratp.geojson", "r") as lines:
+with open("data_ratp/traces-du-reseau-de-transport-ferre-ratp.geojson", "r") as lines:
     ratp_dict = json.load(lines)
 
 all_lines = ["all"]
 for feature in ratp_dict['features']:
-    line = feature['properties']['route_short_name']
+    route = feature['properties']['res_com']
+    if len(route.split(" ")) == 2:
+        line = route.split(" ")[1]
+    else:
+        line = route
     all_lines.append(line)
 
 fig0 = go.Figure()
@@ -56,7 +60,7 @@ def generate_options_card(data):
                 id='dropdown-net',
                 value=[],
                 multi=True,
-                style={'minWidth': '150px'}
+                style={'minWidth': '100px'}
             ),
             html.H2("ligne"),
             dcc.Dropdown(
@@ -93,11 +97,6 @@ def generate_options_card(data):
                 id='aggregate-choice',
                 labelStyle={'display': 'inline-block', 'marginTop': '5px'}
             ),
-
-            html.Br(),
-            html.Button(
-                id='button_update_fig', disabled=True, title='charger les mesures')
-
         ]
     )
 
@@ -214,7 +213,7 @@ def generate_message_card():
         children=[
             dcc.Markdown(
                 id='ingest-card-message',
-                children="## ",
+                children="Dans le bloc du haut, indique la ligne et le réseau de ton nouveau capteur ou sélectionne un capteur existant.",
             ),
 
         ])

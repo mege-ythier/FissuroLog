@@ -1,29 +1,48 @@
 /* Grid
 –––––––––––––––––––––––––––––––––––––––––––––––––– */
-body, h1, h2, h3, h4, h5, p,.DateInput_input {
+body, h1, h2, h3, h4, h5,p.DateInput_input {
     color : rgb(10, 0, 130);
     margin: 0;
     padding: 0;
     font-family:  Calibri;
+    font-weight: 2000
+}
+
+
+.DateRangePickerInput {
+    display: flex;
+    flex-direction: row;
+}
+.DateInput {
+    width:40%;
+}
+
+body{
+    font-size: 0.75em
+}
+.Select-arrow-zone{ 
+    width: 0%}
+
+.DateInput_input {
+    font-size: 1em;
+    margin: 0;
+    padding: 0;
 }
 
 h1 {
     font-size: 50px;
     font-family: Montserrat, serif;
-    font-weight: 2000
 }
 
 h2 {color : rgb(255, 255, 255);
-    font-size: 20px;
+    font-size: 1.5em;
     font-family: Montserrat, serif;
-    font-weight: 2000;
     margin-left: 20px;
-    margin-right: 5px;
+    margin-right: 5px; 
 
 }
 
 h5 {
-    font-weight: 2000;
     margin-left: 0px;
 }
 
@@ -33,11 +52,11 @@ h5 {
     background-image:url('mur_brique.jpg') ;
     background-size: cover;
     /* width: 90%; */
-    padding: 20px 100px 20px 50px;
+    /* padding: 20px 100px 20px 50px; */
+    padding:10px;
     display: block;
     margin: 0px 0px 0px 0px;
     
-
 }
 
     .header{
@@ -51,38 +70,41 @@ h5 {
     #app-container-inner{
         width: 100%;
         display: block;
-        background-color: rgb(155,210,200);
         margin: 0px 0px 0px 0px;
-        padding: 0px 30px 0px 0px;
+        padding: 0px 0px 0px 0px;
     }
         #select-data-card {
             width: 100%;
             display: flex;
             flex-direction: row;
+            align-items: flex-start;
             margin: 0px 0px 0px 0px;
             padding: 0px 0px 0px 0px;
-            border: 5px solid rgb(235, 45, 54) 
-        
+            border: 5px solid rgb(235, 45, 54);
         }
+
+            #button_update_fig_card {
+                border: 5px solid rgb(242, 29, 196);
+                width: 5%;
+            }
 
             #image-card {
                 width: 20%;
-                border: 5px solid rgb(215, 81, 193);
+                border: 5px solid rgb(112, 215, 81);
+                box-shadow: 10px 5px 5px rgba(32, 32, 33, 0.7);
                 margin: 10px 10px 10px 10px;
                 padding: 0px 0px 0px 0px;
             }
 
             #vertical-card {
-                width: 80%;
-                margin: 10px 10px 10px 10px;
-                padding: 0px 0px 0px 0px;
-                border: 5px solid rgb(45, 226, 235)       
+                width: 75%;
+                border: 5px solid rgb(45, 226, 235);
+                background-color: rgb(155,210,200);        
             }
 
                     #map-card {
                         border: 5px solid rgb(215, 184, 81);
-                        margin: 20px 0px 0px 0px;
-                    
+                        margin: 10px
                     }  
 
                     #options-card {
@@ -91,12 +113,12 @@ h5 {
                         flex-direction: row;
                         background-color:rgb(0, 170, 145);
                         padding: 10px 10px 10px 10px;
+                        margin: 10px;
                         box-shadow: 10px 5px 5px rgba(32, 32, 33, 0.7);    
                     }   
 
         #time-series-card {
-            width: 100%;
-            margin: 10px;
+            margin: 5px;
             border: 5px solid rgb(83, 215, 81);
         }
 
@@ -104,18 +126,17 @@ h5 {
             border: 5px solid rgb(242, 221, 29);
             display: flex;
             flex-direction: row;
-            height: 80%;
-
+            width: 100%;
         }
         
             #upload-card {
                 border: 5px solid rgb(7, 11, 241);
+                background-color: rgb(155,210,200);  
                 width: 20%;
                 margin: 0px 0px 0px 0px;
                 padding: 0px 0px 0px 0px;
             }
-                #upload-file-dcc, #upload-image-dcc {
-                   
+                #upload-file-dcc, #upload-image-dcc {  
                     font-size: 0.8em;
                     font-family:  Arial;
                     color: rgb(255, 255, 255);
@@ -123,48 +144,46 @@ h5 {
                     line-Height: 1em;
                     border-Width: 1px;
                     border-Style: dashed;
-                    /* border-Radius: 50px; */
                     text-Align: center;
                     margin: 10px;
                     padding: 5px
                 }     
 
             #form-card {
-    
                 border: 5px solid rgb(242, 29, 228);
+                background-color: rgb(155,210,200);  
                 margin: 0px 0px 0px 0px;
                 padding: 0px 0px 0px 0px;
                 display: flex;
                 flex-direction: row;
-             
                 }
 
                 #form-card > div{
                     border: 5px solid rgb(114, 242, 29);
                     margin :0px 30px 0px 0px
-
                                 } 
 
             #button-card {
-
                 border: 5px solid rgb(29, 210, 242);
-                width: 6%;
+                width: 5%;
                 margin: 0px 0px 0px 0px;
                 padding: 0px 0px 0px 0px;
-                
                 }
-            
- #button_update_fig {
+
+            #message-card {
+                border: 5px solid rgb(29, 210, 242);
+                background-color: rgb(155,210,200);  
+                width: 30%;
+                margin: 0px 0px 0px 0px;
+                padding: 0px 0px 0px 0px;
+                }
+         
+
+#button-ingest, #button-delete-table, #button-update-metadata,#button_update_fig {
+    border: 20px;       /* Suppression de la bordure */
     padding:0px;
-    border: 20px;       /* Suppression de la bordure */
-    background-color:rgb(0, 170, 145);
-}
-
-#button-ingest, #button-delete-table, #button-update-metadata {
-
-    border: 20px;       /* Suppression de la bordure */
-    margin:  20px 10px 20px 10px;
-    background-color:rgb(155,210,200);
+    /* margin:  0px 0px 0px 0px; */
+    background-color: rgba(0,0,0,0);
 }
 
 
@@ -174,45 +193,36 @@ button:hover {
 }
 
 
-#button-ingest::after{
-    content: '\1F4E4';
+#button-ingest::after, #button-delete-table::before, #button-update-metadata::before, #button_update_fig::before  {
     font-family: 'webdings', sans-serif; 
     color: white;
-    font-size: 50px;
-    background-color: rgb(223, 133, 182);
-    border-radius: 50px;
-
-}
-#button-delete-table::before {
-    content: '\2702';
-    font-family: 'webdings', sans-serif; 
-    color: white; 
-    margin: 0px;
-    font-size: 50px;
-    background-color: darkorchid;
+    font-size: 3.5em;
     border-radius: 50px;
     padding: 5px;
-   
 }
+
+
+#button-ingest::after {
+    content: '\1F4E4';
+    background-color: rgb(223, 133, 182);
+}
+
+
+#button-delete-table::before {
+    content: '\2702';
+    background-color: darkorchid;
+}
+
 #button-update-metadata::before {
     content: '\1F5D8';
-    font-family: 'webdings', sans-serif; 
-    color: white;
     background-color: rgba(237, 244, 21, 0.78);
-    border-radius: 50px;
-    margin: 0px;
-    font-size: 60px;
+
 }
 
 #button_update_fig::before {
     content: '\1F4E5';
-    font-family: 'webdings', sans-serif; 
-    color: white;
     background-color: rgba(244, 244, 21, 0.78);
-    border-radius: 50px;
-    margin: 0px;
-    font-size: 60px;
- 
+
 }
 
 
