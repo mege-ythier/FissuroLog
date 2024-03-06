@@ -15,12 +15,10 @@ from ingest_module import save_in_database
 from ingest_module import parse_file_and_update_ingest_card
 from fig_module import create_time_series_fig, create_map
 
-app = Dash(__name__, prevent_initial_callbacks=True)
+app = Dash(__name__)
 server = app.server
 
 # initialisation des données
-sensors_df0 = pd.read_csv("data_capteur/map.csv", sep=";")
-map0 = create_map(sensors_df0.to_dict('records'))
 
 app.layout = html.Div(
     id='app-container',
@@ -35,17 +33,18 @@ app.layout = html.Div(
             id="app-container-inner",
             children=[
 
-                dcc.Store(id='store-map-csv', data=sensors_df0.to_dict("records")),
+                dcc.Store(id='store-map-csv'),
 
                 html.Div(
                     id='select-data-card', children=[
                         html.Div(
-                            id='button_update_fig_card', children= html.Button(id='button_update_fig', hidden=True, title='charger les mesures')),
+                            id='button_update_fig_card',
+                            children=html.Button(id='button_update_fig', hidden=True, title='charger les mesures')),
                         html.Div(
                             id='vertical-card',
                             children=[
-                                generate_options_card(sensors_df0.to_dict("records")),
-                                generate_map_card(map0),
+                                generate_options_card(),
+                                generate_map_card(create_map({})),
                                 html.H3(id='fig-message', children="click sur la carte"),
                             ]
                         ),
@@ -220,8 +219,6 @@ def encode_image(image_path):
     Output('textarea-delta', "value"),
     Output('button-update-metadata', 'hidden'),
     Output('button-delete-table', 'hidden'),
-    Output('textarea-date-pose', "disabled"),
-    Output('textarea-num', "disabled"),
     Input('button_update_fig', 'n_clicks'),
     Input('dropdown-table', 'value'),
     State('date-picker-select', "start_date"),
@@ -230,13 +227,12 @@ def encode_image(image_path):
     State('store-map-csv', 'data'),
     State('textarea-model', "value"),
     prevent_initial_call=True, interval=10000)
-def update_with_table_changed(n_clicks, table_name, start_date, end_date, aggregate, data, model0):
+def update_with_table_changes(n_clicks, table_name, start_date, end_date, aggregate, data, model0):
     store = {}
     fig = fig0
     fig_message = "aucune donnée"
     image_card = html.H3("")
     model, num, zone, pk, place, lat, long, date_pose, date_depose, delta = model0, "", "", "", "", "", "", "", "", ""
-    date_pose_disabled, num_disabled = False, False
     button_update_metadata_is_hidden, button_delete_table_is_hidden = True, True
 
     sensors_df = pd.DataFrame(data)
@@ -244,8 +240,6 @@ def update_with_table_changed(n_clicks, table_name, start_date, end_date, aggreg
     if table_name:
         button_update_metadata_is_hidden = False
         button_delete_table_is_hidden = False
-        date_pose_disabled = True
-        num_disabled = True
         model = sensors_df.loc[table_name, "Modele"]
         num = sensors_df.loc[table_name, "Num"]
         zone = sensors_df.loc[table_name, "Zone"]
@@ -301,8 +295,7 @@ def update_with_table_changed(n_clicks, table_name, start_date, end_date, aggreg
     return (store, fig, True, fig_message,
             image_card, str(model), str(num), zone, place, str(pk), str(lat), str(long), str(date_pose),
             str(date_depose), str(delta),
-            button_update_metadata_is_hidden, button_delete_table_is_hidden, date_pose_disabled,
-            num_disabled)
+            button_update_metadata_is_hidden, button_delete_table_is_hidden)
 
 
 @callback(
@@ -353,27 +346,27 @@ def ingest_middle_step(click, table_select, tables, model, num, net, line, zone,
 
         return True, confirm_message, {"Table": table_select}, ingest_card_message
 
-    elif any(value is None for value in [net, line, zone, model, num, lat, long]):
-        ingest_card_message = "Des élements ne sont pas renseignés"
-        return False, "", None, ingest_card_message
-
     elif any(len(value) == 0 for value in [net, line]):
-        ingest_card_message = "La ligne ou le réseau ne sont pas renseignés"
+        ingest_card_message = "La ligne ou le réseau ne sont pas renseignés dans les menus déroulants"
         return False, "", None, ingest_card_message
 
-    elif not (re.compile(r'^[a-zA-Z]+$').match(zone)):
+    elif any(value == "" for value in [zone, model, lat, long]):
+        ingest_card_message = "Des élements obligatoires ne sont pas renseignés dans le formulaire"
+        return False, "", None, ingest_card_message
+
+    elif not (re.compile(r'^[a-zA-Z\s]+$').match(zone)):
         ingest_card_message = "Le nom de la zone est formé de lettres."
         return False, "", None, ingest_card_message
     # todo : autoriser les valeurs vides
-    elif not (re.compile(r'^[a-zA-Z0-9]+$').match(lieu)):
+    elif not (re.compile(r'^[a-zA-Z0-9\s]+$').match(lieu) or lieu == ""):
         ingest_card_message = "La précision de la zone comporte uniquement des lettres ou des chiffres."
         return False, "", None, ingest_card_message
 
-    elif not (re.compile(r'^-?\d*\.?\d*$').match(pk)):
+    elif not (re.compile(r'^-?\d*\.?\d*$').match(pk) or pk == ""):
         ingest_card_message = f"""Le pk est un chiffre."""
         return False, "", None, ingest_card_message
 
-    elif not (re.compile(r'^[a-zA-Z0-9]+$').match(num)):
+    elif not (re.compile(r'^[a-zA-Z0-9]+$').match(num) or num == ""):
         ingest_card_message = "Le numéro du capteur comporte uniquement des lettres ou des chiffres."
         return False, "", None, ingest_card_message
 
@@ -392,9 +385,8 @@ def ingest_middle_step(click, table_select, tables, model, num, net, line, zone,
     else:
         line = line[0]
         net = net[0]
-        date_pose_yyyymmdd = datetime.strptime(date_pose, "%d/%m/%Y").strftime("%Y%m%d")
         net_dict = {"RER": "RER", "METRO": "M", "TRAM": "T"}
-        table_created = net_dict[net] + line + "_" + model + "_" + num + "_" + date_pose_yyyymmdd
+        table_created = net_dict[net] + str(int(datetime.today().replace(microsecond=0).timestamp()))
 
         if table_created in tables:
             confirm_message = f"""
@@ -447,30 +439,20 @@ def show_message_upload_image(contents):
     State('store-data-uploaded', 'data'),
     State('store-map-csv', 'data'),
     State('store-metadata-to-ingest', 'data'),
-    State('upload-image-dcc', 'contents'),
-    Prevent_initial_call=True, interval=10000, prevent_initial_call='initial_duplicate')
+    State('upload-image-dcc', 'contents'), interval=10000, prevent_initial_call='initial_duplicate')
 def ingest_final_step(click, data, all_metadata, metadata, image_contents):
     image_upload_info = ["aucune image uploadée"]
     # quand on lance l'appli le submit_n_clicks de confirm-throw-ingestion prend la valeur None et donc il y a un call
     if click is None:
-        raise PreventUpdate
+        sensors_df = pd.read_csv("data_capteur/map.csv", sep=";")
+        return (sensors_df.to_dict('records'),
+                ("Dans le bloc du haut, indique la ligne et le réseau de ton nouveau capteur ou sélectionne un "
+                 "capteur existant."), None)
     elif metadata == {}:
         raise PreventUpdate
     else:
         table_name = metadata["Table"]
-        route = table_name.split("_")[0]
         df = pd.DataFrame(data)
-
-        # extraire la liste des capteurs de la route avant l'ingestion
-        conn = sqlite3.connect('data_capteur/database.db')
-        cursor = conn.cursor()
-        cursor.execute(f"""
-        SELECT name
-        FROM sqlite_master
-        WHERE type='table' AND name like '{route}%';""")
-        tables_name = cursor.fetchall()
-        tables_name = [x[0] for x in tables_name]
-        conn.close()
 
         # sauvegarder les données dans la database
         save_in_database(df, table_name)
@@ -480,19 +462,15 @@ def ingest_final_step(click, data, all_metadata, metadata, image_contents):
         cursor = conn.cursor()
         cursor.execute(f"SELECT COUNT(*) FROM {table_name};")
         table_length = cursor.fetchone()[0]
-        # cursor.execute(f"PRAGMA table_info({table_name})")
-        # columns_info = cursor.fetchall()
         conn.close()
 
-        if not table_name in tables_name:
-            tables_name.append(table_name)
-            all_metadata.append(metadata)
+        # mise à jour du store
+        all_metadata.append(metadata)
 
-        database_info = (
-                [f""" ### Information sur l'ingestion.
-Le capteur {table_name} a mesuré {table_length} ouvertures  .  
-La liste des capteurs de la ligne {route} est :"""] + [f"- {table}\n" for table in tables_name]
-        )
+        database_info = ([
+            f""" ### Information sur l'ingestion.
+Le capteur {table_name} a mesuré {table_length} ouvertures.
+"""])
 
         try:
             content_format, content_string = image_contents.split(',')
@@ -514,7 +492,6 @@ La liste des capteurs de la ligne {route} est :"""] + [f"- {table}\n" for table 
                 f.write(decoded)
             image_upload_info = ["succes de l'intégration de l'image"]
 
-        # return all_metadata, database_info + image_upload_info, None, table_name
         return all_metadata, database_info + image_upload_info, table_name
 
 
@@ -529,20 +506,31 @@ La liste des capteurs de la ligne {route} est :"""] + [f"- {table}\n" for table 
     State('textarea-long', 'value'),
     State('textarea-pk', 'value'),
     State('textarea-delta', 'value'),
+    State('textarea-num', 'value'),
+    State('textarea-date-pose', 'value'),
+    State('textarea-date-depose', 'value'),
     State('upload-image-dcc', 'contents'),
     Prevent_initial_call=True, interval=10000, prevent_initial_call='initial_duplicate'
-    # Prevent_initial_call=True, interval=10000
+
 )
-def update_sensors_info(click, sensors_data_stored, table_name, lat, long, pk, delta, image_contents):
+def update_sensors_info(click, sensors_data_stored, table_name, lat, long, pk, delta, num, date_pose, date_depose,
+                        image_contents):
     if click is None or table_name is None:
         raise PreventUpdate
 
     sensors_df = pd.DataFrame(sensors_data_stored)
     sensors_df = sensors_df.set_index("Table")
 
+    if num in ['nan', 'None']: num = ""
+    if date_depose in ['nan', 'None']: date_depose = ""
+    if pk in ['nan', 'None']: pk = ""
+
     try:
         if pk != "": float(pk)
         float(lat), float(long), float(delta)
+
+        if date_depose != "":
+            datetime.strptime(date_depose, "%d/%m/%Y")
 
         if image_contents:
             content_format, content_string = image_contents.split(',')
@@ -550,19 +538,20 @@ def update_sensors_info(click, sensors_data_stored, table_name, lat, long, pk, d
                 raise ValueError("fichier image invalide")
 
     except (TypeError, ValueError) as e:
-        return f"echec de la mise à jour des données : {e}", sensors_data_stored
+        return sensors_data_stored, f"echec de la mise à jour des données : {e}"
 
     except ValueError("fichier image invalide") as e:
-        return f"echec de la mise à jour des données : {e}", sensors_data_stored
+        return sensors_data_stored, f"echec de la mise à jour des données : {e}"
 
     else:
         sensors_df.loc[table_name, "Latitude"] = float(lat)
         sensors_df.loc[table_name, "Longitude"] = float(long)
         sensors_df.loc[table_name, "Ouverture_pose"] = float(delta)
-        if pk == "":
-            sensors_df.loc[table_name, "pk"] = ""
-        else:
-            sensors_df.loc[table_name, "pk"] = float(pk)
+        sensors_df.loc[table_name, "Date_pose"] = date_pose
+        sensors_df.loc[table_name, "Date_depose"] = date_depose
+        sensors_df.loc[table_name, "Num"] = num
+        sensors_df.loc[table_name, "pk"] = pk
+
 
         sensors_df.reset_index(inplace=True)
         sensors_data_stored = sensors_df.to_dict('records')
@@ -632,9 +621,8 @@ def delete_table_final_step(click, table_select, sensors_data):
 
 @callback(Output('map', 'figure'),
           Input('store-map-csv', 'data'),
-          )
+          prevent_initial_call=True)
 def update_map(sensors_data):
-    print("update map store")
     sensors_df = pd.DataFrame(sensors_data)
     sensors_df.to_csv("data_capteur/map.csv", index=False, sep=";", header=True, mode="w")
     return create_map(sensors_data)
@@ -643,3 +631,4 @@ def update_map(sensors_data):
 if __name__ == '__main__':
     app.run(debug=True, port=8051)
     # app.run(debug=True, host='0.0.0.0', port=8051)
+    #app.run()

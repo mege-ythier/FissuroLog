@@ -1,10 +1,9 @@
 import base64
-import datetime
 import io
 import sqlite3
 
 import numpy as np
-from dash import Dash, dcc, html, dash_table, Input, Output, State, callback
+from dash import html
 import pandas as pd
 from dash.dash_table import DataTable
 from dash.exceptions import PreventUpdate
@@ -86,14 +85,14 @@ def parse_file_and_update_ingest_card(contents, filename):
             return (
                 {},  # store-data-uploaded'
                 # upload-card-inner
-                html.Div(id='upload-card', children=[
-                    html.H5("Information sur le fichier téléchargé"),
-                    dcc.Markdown(children=f'{e} , Contactes amandine.mege-ythier@ratp.fr'),
-                    DataTable(data=df.to_dict('records'), page_size=10),
+                html.Div(children=[
+                    html.H3("Information sur le fichier téléchargé"),
+                    html.H4(f"Le nom du fichier est {filename}."),
+                    html.H4(f'{e} , Contactes amandine.mege-ythier@ratp.fr')
                 ]),
 
                 False,  # button-ingest
-                f"inconnu",  # textarea-model
+                f"",  # textarea-model
                 "erreur dans le parsing",  # ingest-card-message
             )
 

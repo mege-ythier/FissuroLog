@@ -168,19 +168,39 @@ def create_time_series_fig(df, table_name, delta_mm):
                 # type='buttons',
                 type='dropdown',
                 buttons=[
-                    dict(label='Mesures brutes',
+                    dict(label='sans offset',
                          method='update',
                          args=[{'visible': [True, False, True]}, {"yaxis": yaxis1_no_shift}]),
-                    dict(label='Mesures centrées',
+                    dict(label='avec offset',
                          method='update',
                          args=[{'visible': [False, True, True]}, {"yaxis": yaxis1_shift}]),
                 ],
                 active=0,
                 showactive=True,
                 direction="down",
-                x=-0.015,
-                xanchor="right",
+                x=-0.1,
+                xanchor="left",
                 y=0.52,
+                yanchor="top",
+                bgcolor="white"
+
+            ), dict(
+
+                type='dropdown',
+                buttons=[
+                    dict(label='avec ligne',
+                         method='update',
+                         args=[{'mode': ['markers', 'markers', 'markers']}]),
+                    dict(label='sans ligne',
+                         method='update',
+                         args=[{'mode': ['lines+markers','lines+markers', 'lines+markers']}]),
+                ],
+                active=0,
+                showactive=True,
+                direction="down",
+                x=-0.1,
+                xanchor="left",
+                y=0.3,
                 yanchor="top",
                 bgcolor="white"
 
@@ -215,11 +235,6 @@ def create_map(sensors_data):
     with open("data_ratp/couleur-ratp-carte.json", 'r') as files:
         color_dict = json.load(files)
 
-    sensors_df = pd.DataFrame(sensors_data)
-    sensors_df["Route"] = sensors_df["Reseau"] +" "+sensors_df["Ligne"].astype(str)
-
-    routes_displayed = (sensors_df["Route"]).unique()
-
     fig = go.Figure()
     fig.update_layout(
         # height=600,
@@ -237,77 +252,83 @@ def create_map(sensors_data):
         clickmode='event+select')
 
     # dessiner les lignes
-    routes_drawn = []
-    for feature in ratp_dict['features']:
-        geometry = feature.get('geometry')
-        if geometry:
-            route = feature['properties']['res_com']
-            coordinates = feature['geometry']['coordinates']
-            for i in range(len(coordinates)):
-                lon, lat = zip(*coordinates[i])
-                fig.add_trace(
-                    go.Scattermapbox(
-                        mode="lines",
-                        lon=lon,
-                        lat=lat,
-                        line=dict(width=3, color=color_dict[route]),
-                        name=route,
-                        hoverinfo='text',
-                        hovertext=route,
-                        showlegend=False,
-                        customdata=[route] * len(lon),
-                        legendgroup=route,
-                        visible='legendonly',
+    if sensors_data == {}:
+        fig.add_trace(go.Scattermapbox())
+    else :
+        sensors_df = pd.DataFrame(sensors_data)
+        sensors_df["Route"] = sensors_df["Reseau"] +" "+sensors_df["Ligne"].astype(str)
+        routes_displayed = (sensors_df["Route"]).unique()
+        routes_drawn = []
+        for feature in ratp_dict['features']:
+            geometry = feature.get('geometry')
+            if geometry:
+                route = feature['properties']['res_com']
+                coordinates = feature['geometry']['coordinates']
+                for i in range(len(coordinates)):
+                    lon, lat = zip(*coordinates[i])
+                    fig.add_trace(
+                        go.Scattermapbox(
+                            mode="lines",
+                            lon=lon,
+                            lat=lat,
+                            line=dict(width=3, color=color_dict[route]),
+                            name=route,
+                            hoverinfo='text',
+                            hovertext=route,
+                            showlegend=False,
+                            customdata=[route] * len(lon),
+                            legendgroup=route,
+                            visible='legendonly',
+                        )
                     )
+                    if route in routes_displayed:
+                        fig.update_traces(selector=dict(name=route), patch=dict(visible=True))
+
+                    if route not in routes_drawn:
+                        fig.update_traces(selector=dict(name=route), patch=dict(showlegend=True))
+                    routes_drawn.append(route)
+
+        # dessiner les capteurs
+        for i in range(sensors_df.shape[0]):
+            sensor = sensors_df.iloc[i, :]
+            fig.add_trace(
+                go.Scattermapbox(
+                    name=sensor["Table"],
+                    mode="markers",
+                    lat=[sensor["Latitude"]],
+                    lon=[sensor["Longitude"]],
+                    hoverlabel=dict(bgcolor="pink", namelength=15),
+                    # hoverinfo='text',
+                    # hovertext=sensor["Zone"],
+                    # text=str(sensor["Ligne"]),
+                    customdata=[sensor],
+                    hovertemplate='Date de la pose: %{customdata[10]}<br>'
+                                  'Ouverture initiale: %{customdata[12]}<br>'
+                                  'Modèle: %{customdata[6]}<br>'
+                                  'Numéros: %{customdata[7]}<br> ',
+                    marker=dict(
+                        size=10,
+                        color='black',
+                        opacity=0.7
+                    ),
+                    selected=dict(marker=dict(
+                        size=20,
+                        color='green',
+                        opacity=1
+                    )),
+
+                    unselected=dict(marker=dict(
+                        size=10,
+                        color='black',
+                        opacity=0.5
+                    )),
+
+                    legendgroup=sensor["Route"],
+                    legendgrouptitle={"font": {"color": "blue", "family": "Arial", "size": 3}, "text": "test"},
+                    showlegend=False,
+                    visible=True
+                    # cluster=dict(enabled=True,color="yellow",maxzoom=23,size=1)
                 )
-                if route in routes_displayed:
-                    fig.update_traces(selector=dict(name=route), patch=dict(visible=True))
-
-                if route not in routes_drawn:
-                    fig.update_traces(selector=dict(name=route), patch=dict(showlegend=True))
-                routes_drawn.append(route)
-
-    # dessiner les capteurs
-    for i in range(sensors_df.shape[0]):
-        sensor = sensors_df.iloc[i, :]
-        fig.add_trace(
-            go.Scattermapbox(
-                name=sensor["Table"],
-                mode="markers",
-                lat=[sensor["Latitude"]],
-                lon=[sensor["Longitude"]],
-                hoverlabel=dict(bgcolor="pink", namelength=15),
-                # hoverinfo='text',
-                # hovertext=sensor["Zone"],
-                # text=str(sensor["Ligne"]),
-                customdata=[sensor],
-                hovertemplate='Date de la pose: %{customdata[10]}<br>'
-                              'Ouverture initiale: %{customdata[12]}<br>'
-                              'Modèle: %{customdata[6]}<br>'
-                              'Numéros: %{customdata[7]}<br> ',
-                marker=dict(
-                    size=10,
-                    color='black',
-                    opacity=0.7
-                ),
-                selected=dict(marker=dict(
-                    size=20,
-                    color='green',
-                    opacity=1
-                )),
-
-                unselected=dict(marker=dict(
-                    size=10,
-                    color='black',
-                    opacity=0.5
-                )),
-
-                legendgroup=sensor["Route"],
-                legendgrouptitle={"font": {"color": "blue", "family": "Arial", "size": 3}, "text": "test"},
-                showlegend=False,
-                visible=True
-                # cluster=dict(enabled=True,color="yellow",maxzoom=23,size=1)
             )
-        )
 
     return fig

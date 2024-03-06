@@ -47,8 +47,7 @@ def generate_map_card(fig):
     )
 
 
-def generate_options_card(data):
-    sensors_df = pd.DataFrame(data)
+def generate_options_card():
 
     return html.Div(
         id='options-card',
@@ -73,7 +72,6 @@ def generate_options_card(data):
             html.Br(),
             html.H2("capteur"),
             dcc.Dropdown(
-                options=sensors_df["Table"],
                 id='dropdown-table',
                 multi=False,
                 style={'minWidth': '200px'}
@@ -82,12 +80,11 @@ def generate_options_card(data):
             dcc.DatePickerRange(
                 display_format='D M Y',
                 id="date-picker-select",
-                start_date=datetime.today().date() - relativedelta(years=5),
+                start_date=datetime.today().date() - relativedelta(years=30),
                 end_date=datetime.today().date(),
-                min_date_allowed=datetime(2020, 1, 1),
+                min_date_allowed=datetime(2000, 1, 1),
                 max_date_allowed=datetime.today().date(),
-                initial_visible_month=datetime.today().date() - relativedelta(years=3),
-                style={'padding': '0px 0px 0px 0px', 'margin': '0px'}
+                initial_visible_month=datetime.today().date() - relativedelta(years=2),
             ),
             html.Br(),
             html.H2("Agréger"),
@@ -159,7 +156,7 @@ def generate_form_card():
                                 ),
                             ]),
                         html.Div([
-                            html.H5("numero du capteur *"),
+                            html.H5("numero du capteur"),
                             dcc.Textarea(
                                 id='textarea-num',
                                 value=''
@@ -175,7 +172,7 @@ def generate_form_card():
                                 value=''
                             ),
 
-                            html.H5("pk de la zone*"),
+                            html.H5("pk de la zone"),
                             dcc.Textarea(
                                 id='textarea-pk',
                                 value=''
@@ -213,7 +210,6 @@ def generate_message_card():
         children=[
             dcc.Markdown(
                 id='ingest-card-message',
-                children="Dans le bloc du haut, indique la ligne et le réseau de ton nouveau capteur ou sélectionne un capteur existant.",
             ),
 
         ])
