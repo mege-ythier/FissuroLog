@@ -4,7 +4,7 @@ from datetime import datetime
 import re
 import os
 
-import numpy
+import numpy as np
 from dash import Dash, html, dcc, Input, Output, callback, State
 from dash.exceptions import PreventUpdate
 import pandas as pd
@@ -250,7 +250,13 @@ def update_with_table_changes(n_clicks, table_name, start_date, end_date, aggreg
         date_pose = sensors_df.loc[table_name, "Date_pose"]
         date_depose = sensors_df.loc[table_name, "Date_depose"]
         delta = sensors_df.loc[table_name, "Ouverture_pose"]
-        # if numpy.isnan(pk): pk = ""
+
+        if not num: num = ""
+        if not date_depose: date_depose = ""
+        if not pk: pk = ""
+        if not delta: delta = ""
+        if type(pk) == np.float64 and np.isnan(pk) == True: pk = ""
+        if type(delta) == np.float64 and np.isnan(delta) == True: delta = ""
 
         start_date_timestamp = datetime.strptime(start_date, "%Y-%m-%d").timestamp()
         end_date_timestamp = datetime.strptime(end_date, "%Y-%m-%d").timestamp()
@@ -329,65 +335,74 @@ def ingest_first_step(contents, filename):
     State('textarea-lat', 'value'),
     State('textarea-date-pose', 'value'),
     State('textarea-date-depose', 'value'),
+    State('textarea-delta', 'value'),
+    State('store-map-csv', 'data'),
+
     prevent_initial_call=True, interval=10000)
 def ingest_middle_step(click, table_select, tables, model, num, net, line, zone, lieu, pk, long, lat, date_pose,
-                       date_depose):
+                       date_depose, delta, metadata_stored):
     ingest_card_message = f""
+    confirm_message_is_displayed = False
+    confirm_message = ""
+    table_metadata = None
     if click is None:
         raise PreventUpdate
 
-    elif table_select:
-        confirm_message = f"""
-        Les données de ton fichier vont étre intégrées au capteur {table_select}.  
-        click ok, pour lancer l'intégration.
-        
-        click annuler, pour arrêter l'ingestion, puis choisis ou crée le bon capteur.      
-"""
-
-        return True, confirm_message, {"Table": table_select}, ingest_card_message
-
-    elif any(len(value) == 0 for value in [net, line]):
+    if any(len(value) == 0 for value in [net, line]) and not table_select:
         ingest_card_message = "La ligne ou le réseau ne sont pas renseignés dans les menus déroulants"
-        return False, "", None, ingest_card_message
 
     elif any(value == "" for value in [zone, model, lat, long]):
         ingest_card_message = "Des élements obligatoires ne sont pas renseignés dans le formulaire"
-        return False, "", None, ingest_card_message
 
-    elif not (re.compile(r'^[a-zA-Z\s]+$').match(zone)):
-        ingest_card_message = "Le nom de la zone est formé de lettres."
-        return False, "", None, ingest_card_message
-    # todo : autoriser les valeurs vides
-    elif not (re.compile(r'^[a-zA-Z0-9\s]+$').match(lieu) or lieu == ""):
-        ingest_card_message = "La précision de la zone comporte uniquement des lettres ou des chiffres."
-        return False, "", None, ingest_card_message
+    # elif not (re.compile(r'^[a-zA-Z\s]+$').match(zone)):
+    #     ingest_card_message = "Le nom de la zone est formé de lettres."
 
     elif not (re.compile(r'^-?\d*\.?\d*$').match(pk) or pk == ""):
         ingest_card_message = f"""Le pk est un chiffre."""
-        return False, "", None, ingest_card_message
+
+    elif not (re.compile(r'^-?\d*\.?\d*$').match(delta) or delta == ""):
+        ingest_card_message = f"""L'ouverture est un chiffre."""
+
+    elif not (re.compile(r'^-?\d*\.?\d*$').match(lat)):
+        ingest_card_message = f"""La latitude est un chiffre."""
+
+    elif not (re.compile(r'^-?\d*\.?\d*$').match(long)):
+        ingest_card_message = f"""Le longitude est un chiffre."""
 
     elif not (re.compile(r'^[a-zA-Z0-9]+$').match(num) or num == ""):
         ingest_card_message = "Le numéro du capteur comporte uniquement des lettres ou des chiffres."
-        return False, "", None, ingest_card_message
 
     elif not (re.compile(r'^\d{2}/\d{2}/\d{4}$').match(date_pose)):
         ingest_card_message = "Le date de pose est de la forme 01/01/2024."
-        return False, "", None, ingest_card_message
 
     elif not (re.compile(r'^\d{2}/\d{2}/\d{4}$').match(date_depose) or date_depose == ""):
         ingest_card_message = "Le date de dépose est de la forme 01/01/2024."
-        return False, "", None, ingest_card_message
 
     elif any(len(value) > 1 for value in [net, line]):
         ingest_card_message = "Sélectionne une seule ligne!"
-        return False, "", None, ingest_card_message
+
+    elif table_select:
+        # on prendre la valeur du reseau et de la ligne dans le store
+        metadata_stored_df = pd.DataFrame(metadata_stored)
+        metadata_stored_df.set_index('Table', inplace=True)
+        net = metadata_stored_df.loc[table_select, "Reseau"]
+        line = metadata_stored_df.loc[table_select, "Ligne"]
+        table_metadata = table_select
+        confirm_message_is_displayed = True
+        confirm_message = f"""
+        Les données de ton fichier vont étre intégrées au capteur existant {table_select}.  
+        click ok, pour lancer l'intégration.
+
+        click annuler, pour arrêter l'ingestion, puis choisis ou crée le bon capteur.      
+"""
 
     else:
         line = line[0]
         net = net[0]
         net_dict = {"RER": "RER", "METRO": "M", "TRAM": "T"}
         table_created = net_dict[net] + str(int(datetime.today().replace(microsecond=0).timestamp()))
-
+        table_metadata = table_created
+        confirm_message_is_displayed = True
         if table_created in tables:
             confirm_message = f"""
 Il y a deja un capteur nommé {table_created} dans le dashboard.
@@ -403,12 +418,12 @@ Vérifies bien que ton capteur n'existe pas sous un autre nom.
 Press OK pour lancer l'ingestion.
 """
 
-        metadata = {'Reseau': net, 'Ligne': line, 'Zone': zone, 'Lieu': lieu, 'pk': pk, 'Modele': model,
-                    'Num': num,
-                    'Latitude': lat, 'Longitude': long, 'Date_pose': date_pose, 'Date_depose': date_depose,
-                    'Ouverture_pose': 0, 'Table': table_created}
+    metadata = {'Reseau': net, 'Ligne': line, 'Zone': zone, 'Lieu': lieu, 'pk': pk, 'Modele': model,
+                'Num': num,
+                'Latitude': lat, 'Longitude': long, 'Date_pose': date_pose, 'Date_depose': date_depose,
+                'Ouverture_pose': delta, 'Table': table_metadata}
 
-        return True, confirm_message, metadata, ingest_card_message
+    return confirm_message_is_displayed, confirm_message, metadata, ingest_card_message
 
 
 @callback(Output('text-error-upload-image', 'children'),
@@ -465,7 +480,25 @@ def ingest_final_step(click, data, all_metadata, metadata, image_contents):
         conn.close()
 
         # mise à jour du store
-        all_metadata.append(metadata)
+        all_metadata_df = pd.DataFrame(all_metadata)
+        # mise a jour du store de metadata
+        if table_name in all_metadata_df['Table'].values:
+            all_metadata_df.set_index('Table', inplace=True)
+            all_metadata_df.loc[table_name, "Modele"] = metadata["Modele"]
+            all_metadata_df.loc[table_name, "Num"] = metadata["Num"]
+            all_metadata_df.loc[table_name, "Zone"] = metadata["Zone"]
+            all_metadata_df.loc[table_name, "Lieu"] = metadata["Lieu"]
+            all_metadata_df.loc[table_name, "Latitude"] = metadata["Latitude"]
+            all_metadata_df.loc[table_name, "Longitude"] = metadata["Longitude"]
+            all_metadata_df.loc[table_name, "pk"] = metadata["Latitude"]
+            all_metadata_df.loc[table_name, "Date_pose"] = metadata["Date_pose"]
+            all_metadata_df.loc[table_name, "Date_depose"] = metadata["Date_depose"]
+            all_metadata_df.loc[table_name, "Ouverture_pose"] = metadata["Ouverture_pose"]
+            all_metadata_df.reset_index(inplace=True)
+            all_metadata = all_metadata_df.to_dict("records")
+        # ajout d'une ligne dans le store
+        else:
+            all_metadata.append(metadata)
 
         database_info = ([
             f""" ### Information sur l'ingestion.
@@ -521,13 +554,10 @@ def update_sensors_info(click, sensors_data_stored, table_name, lat, long, pk, d
     sensors_df = pd.DataFrame(sensors_data_stored)
     sensors_df = sensors_df.set_index("Table")
 
-    if num in ['nan', 'None']: num = ""
-    if date_depose in ['nan', 'None']: date_depose = ""
-    if pk in ['nan', 'None']: pk = ""
-
     try:
-        if pk != "": float(pk)
-        float(lat), float(long), float(delta)
+        if pk == "": pk= np.float64('nan')
+        if delta == "": delta=np.float64('nan')
+        float(lat), float(long), float(pk), float(delta)
 
         if date_depose != "":
             datetime.strptime(date_depose, "%d/%m/%Y")
@@ -546,12 +576,11 @@ def update_sensors_info(click, sensors_data_stored, table_name, lat, long, pk, d
     else:
         sensors_df.loc[table_name, "Latitude"] = float(lat)
         sensors_df.loc[table_name, "Longitude"] = float(long)
-        sensors_df.loc[table_name, "Ouverture_pose"] = float(delta)
+        sensors_df.loc[table_name, "Ouverture_pose"] = delta
         sensors_df.loc[table_name, "Date_pose"] = date_pose
         sensors_df.loc[table_name, "Date_depose"] = date_depose
         sensors_df.loc[table_name, "Num"] = num
         sensors_df.loc[table_name, "pk"] = pk
-
 
         sensors_df.reset_index(inplace=True)
         sensors_data_stored = sensors_df.to_dict('records')
@@ -631,4 +660,4 @@ def update_map(sensors_data):
 if __name__ == '__main__':
     app.run(debug=True, port=8051)
     # app.run(debug=True, host='0.0.0.0', port=8051)
-    #app.run()
+    # app.run()

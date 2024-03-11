@@ -24,7 +24,8 @@ def create_time_series_fig(df, table_name, delta_mm):
                                  opacity=0.7),
                              )
                   )
-    fig.add_trace(go.Scatter(y=df["mm"] - delta_mm,
+    if delta_mm == "": delta_mm = 0
+    fig.add_trace(go.Scatter(y=df["mm"] - float(delta_mm),
                              x=df.index,
                              name="ouverture relative",
                              yaxis="y1",
@@ -293,23 +294,24 @@ def create_map(sensors_data):
             sensor = sensors_df.iloc[i, :]
             fig.add_trace(
                 go.Scattermapbox(
-                    name=sensor["Table"],
+                    name="",
+                    #name=sensor["Table"],
                     mode="markers",
                     lat=[sensor["Latitude"]],
                     lon=[sensor["Longitude"]],
-                    hoverlabel=dict(bgcolor="pink", namelength=15),
-                    # hoverinfo='text',
-                    # hovertext=sensor["Zone"],
-                    # text=str(sensor["Ligne"]),
+                    hoverlabel=dict(bgcolor="black",font=dict(color="white"), namelength=15),
                     customdata=[sensor],
-                    hovertemplate='Date de la pose: %{customdata[10]}<br>'
-                                  'Ouverture initiale: %{customdata[12]}<br>'
+                    hovertemplate='<b>%{customdata[0]} </b><br><br>'
+                                  'Date de la pose: %{customdata[10]}<br>'
                                   'Modèle: %{customdata[6]}<br>'
-                                  'Numéros: %{customdata[7]}<br> ',
+                                  'localisation :%{customdata[3]}<br>'
+                                  '%{customdata[4]}<br>'
+                                  'pk:%{customdata[5]}<br>'
+                                  'Ouverture initiale: %{customdata[12]} mm<br>',
                     marker=dict(
                         size=10,
                         color='black',
-                        opacity=0.7
+                        opacity=0.3
                     ),
                     selected=dict(marker=dict(
                         size=20,
@@ -320,7 +322,7 @@ def create_map(sensors_data):
                     unselected=dict(marker=dict(
                         size=10,
                         color='black',
-                        opacity=0.5
+                        opacity=0.3
                     )),
 
                     legendgroup=sensor["Route"],
