@@ -1,2 +1,2 @@
-Table;Reseau;Ligne;Zone;Lieu;pk;Modele;Num;Latitude;Longitude;Date_pose;Date_depose;Ouverture_pose
-M12_Sites1D_2565_20220224;METRO;12;raccord;raccord;0;Sites1D;2565;48.8390224;2.3001811;24/02/2022;;-4
+Table;Reseau;Ligne;Zone;Lieu;pk;Modele;Num;Latitude;Longitude;Date_pose;Date_depose;Ouverture_pose;Divers
+M12_Sites1D_2565_20220224;METRO;12;raccord;raccord;;Sites1D;2565;48.8390224;2.3001811;24/02/2022;;-4;cocuocu

@@ -217,6 +217,7 @@ def encode_image(image_path):
     Output('textarea-date-pose', "value"),
     Output('textarea-date-depose', "value"),
     Output('textarea-delta', "value"),
+    Output('textarea-divers', "value"),
     Output('button-update-metadata', 'hidden'),
     Output('button-delete-table', 'hidden'),
     Input('button_update_fig', 'n_clicks'),
@@ -226,13 +227,14 @@ def encode_image(image_path):
     State('aggregate-choice', 'value'),
     State('store-map-csv', 'data'),
     State('textarea-model', "value"),
+
     prevent_initial_call=True, interval=10000)
 def update_with_table_changes(n_clicks, table_name, start_date, end_date, aggregate, data, model0):
     store = {}
     fig = fig0
     fig_message = "aucune donnée"
     image_card = html.H3("")
-    model, num, zone, pk, place, lat, long, date_pose, date_depose, delta = model0, "", "", "", "", "", "", "", "", ""
+    model, num, zone, pk, place, lat, long, date_pose, date_depose, delta, divers = model0, "", "", "", "", "", "", "", "", "", ""
     button_update_metadata_is_hidden, button_delete_table_is_hidden = True, True
 
     sensors_df = pd.DataFrame(data)
@@ -250,11 +252,13 @@ def update_with_table_changes(n_clicks, table_name, start_date, end_date, aggreg
         date_pose = sensors_df.loc[table_name, "Date_pose"]
         date_depose = sensors_df.loc[table_name, "Date_depose"]
         delta = sensors_df.loc[table_name, "Ouverture_pose"]
+        divers = sensors_df.loc[table_name, "Divers"]
 
-        if not num: num = ""
-        if not date_depose: date_depose = ""
-        if not pk: pk = ""
-        if not delta: delta = ""
+        if num is None: num = ""
+        if date_depose is None: date_depose = ""
+        if pk is None: pk = ""
+        if delta is None: delta = ""
+        if divers is None: divers = ""
         if type(pk) == np.float64 and np.isnan(pk) == True: pk = ""
         if type(delta) == np.float64 and np.isnan(delta) == True: delta = ""
 
@@ -300,7 +304,7 @@ def update_with_table_changes(n_clicks, table_name, start_date, end_date, aggreg
 
     return (store, fig, True, fig_message,
             image_card, str(model), str(num), zone, place, str(pk), str(lat), str(long), str(date_pose),
-            str(date_depose), str(delta),
+            str(date_depose), str(delta), str(divers),
             button_update_metadata_is_hidden, button_delete_table_is_hidden)
 
 
@@ -336,11 +340,12 @@ def ingest_first_step(contents, filename):
     State('textarea-date-pose', 'value'),
     State('textarea-date-depose', 'value'),
     State('textarea-delta', 'value'),
+    State('textarea-divers', 'value'),
     State('store-map-csv', 'data'),
 
     prevent_initial_call=True, interval=10000)
 def ingest_middle_step(click, table_select, tables, model, num, net, line, zone, lieu, pk, long, lat, date_pose,
-                       date_depose, delta, metadata_stored):
+                       date_depose, delta, divers, metadata_stored):
     ingest_card_message = f""
     confirm_message_is_displayed = False
     confirm_message = ""
@@ -421,7 +426,7 @@ Press OK pour lancer l'ingestion.
     metadata = {'Reseau': net, 'Ligne': line, 'Zone': zone, 'Lieu': lieu, 'pk': pk, 'Modele': model,
                 'Num': num,
                 'Latitude': lat, 'Longitude': long, 'Date_pose': date_pose, 'Date_depose': date_depose,
-                'Ouverture_pose': delta, 'Table': table_metadata}
+                'Ouverture_pose': delta, 'Table': table_metadata, 'Divers': divers}
 
     return confirm_message_is_displayed, confirm_message, metadata, ingest_card_message
 
@@ -493,6 +498,7 @@ def ingest_final_step(click, data, all_metadata, metadata, image_contents):
             all_metadata_df.loc[table_name, "Date_pose"] = metadata["Date_pose"]
             all_metadata_df.loc[table_name, "Date_depose"] = metadata["Date_depose"]
             all_metadata_df.loc[table_name, "Ouverture_pose"] = metadata["Ouverture_pose"]
+            all_metadata_df.loc[table_name, "Divers"] = metadata["Divers"]
             all_metadata_df.reset_index(inplace=True)
             all_metadata = all_metadata_df.to_dict("records")
         # ajout d'une ligne dans le store
@@ -541,11 +547,15 @@ Le capteur {table_name} a mesuré {table_length} ouvertures.
     State('textarea-num', 'value'),
     State('textarea-date-pose', 'value'),
     State('textarea-date-depose', 'value'),
+    State('textarea-lieu', 'value'),
+    State('textarea-zone', 'value'),
+    State('textarea-divers', 'value'),
     State('upload-image-dcc', 'contents'),
     Prevent_initial_call=True, interval=10000, prevent_initial_call='initial_duplicate'
 
 )
-def update_sensors_info(click, sensors_data_stored, table_name, lat, long, pk, delta, num, date_pose, date_depose,
+def update_sensors_info(click, sensors_data_stored, table_name, lat, long, pk, delta, num, date_pose, date_depose, lieu,
+                        zone, divers,
                         image_contents):
     if click is None or table_name is None:
         raise PreventUpdate
@@ -579,6 +589,9 @@ def update_sensors_info(click, sensors_data_stored, table_name, lat, long, pk, d
         sensors_df.loc[table_name, "Date_depose"] = date_depose
         sensors_df.loc[table_name, "Num"] = num
         sensors_df.loc[table_name, "pk"] = pk
+        sensors_df.loc[table_name, "Divers"] = divers
+        sensors_df.loc[table_name, "Zone"] = zone
+        sensors_df.loc[table_name, "Lieu"] = lieu
 
         sensors_df.reset_index(inplace=True)
         sensors_data_stored = sensors_df.to_dict('records')
