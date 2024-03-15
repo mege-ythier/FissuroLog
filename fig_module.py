@@ -34,7 +34,7 @@ def create_time_series_fig(df, table_name, delta_mm):
                                  size=3,
                                  color="green",
                                  opacity=0.7),
-                             visible=False
+                             visible=False,
                              )
                   )
 
@@ -52,19 +52,60 @@ def create_time_series_fig(df, table_name, delta_mm):
 
     fig.update_traces(mode='markers', showlegend=False)
 
-    yaxis1_shift = dict(
+    yaxis1_shift_zoom_1 = dict(
         anchor="x",
-        domain=[0, 0.45],
+        domain=[0, 0.5],
         mirror=True,
         title="mm",
-        range=[-1, 1],
+        range=[-1.1, 1.1],
         showline=True,
         side="left",
         dtick=0.5,
-        # tickmode="array",
-        # tickvals=[-delta_mm-1, -delta_mm, -delta_mm-1],
-        # tickvals=[-15, -10, -5],
-        # ticktext=[-5-delta_mm ,0-delta_mm, 5-delta_mm],
+        ticks="",
+        type="linear",
+        zeroline=False,
+        gridcolor='grey'
+    )
+
+    yaxis1_shift_zoom_2 = dict(
+        anchor="x",
+        domain=[0, 0.5],
+        mirror=True,
+        title="mm",
+        range=[-0.51, 0.51],
+        showline=True,
+        side="left",
+        dtick=0.25,
+        ticks="",
+        type="linear",
+        zeroline=False,
+        gridcolor='grey'
+    )
+
+    yaxis1_shift_zoom_5 = dict(
+        anchor="x",
+        domain=[0, 0.5],
+        mirror=True,
+        title="mm",
+        range=[-0.205, 0.205],
+        showline=True,
+        side="left",
+        dtick=0.1,
+        ticks="",
+        type="linear",
+        zeroline=False,
+        gridcolor='grey'
+    )
+
+    yaxis1_shift_zoom_10 = dict(
+        anchor="x",
+        domain=[0, 0.5],
+        mirror=True,
+        title="mm",
+        range=[-0.11, 0.11],
+        showline=True,
+        side="left",
+        dtick=0.05,
         ticks="",
         type="linear",
         zeroline=False,
@@ -73,14 +114,12 @@ def create_time_series_fig(df, table_name, delta_mm):
 
     yaxis1_no_shift = dict(
         anchor="x",
-        domain=[0, 0.45],
+        domain=[0, 0.5],
         # linecolor="#673ab7",
         mirror=True,
         title="mm",
-        # titlefont={"color": "#673ab7"},
         showline=True,
         side="left",
-        # tickfont={"color": "#673ab7"},
         tickmode="auto",
         # dtick=1,
         ticks="",
@@ -91,8 +130,9 @@ def create_time_series_fig(df, table_name, delta_mm):
     )
 
     fig.update_layout(
-        height=380,
+        height=400,
         margin={'l': 10, 'b': 10, 'r': 10, 't': 60},
+        #plot_bgcolor='rgb(245, 250, 245)',
         plot_bgcolor='rgba(0,0,0,0)',
         #paper_bgcolor='rgba(0,0,0,0)',
         paper_bgcolor='rgb(245, 250, 245)',
@@ -166,48 +206,64 @@ def create_time_series_fig(df, table_name, delta_mm):
     fig.update_layout(
         updatemenus=[
             dict(
-                # type='buttons',
                 type='dropdown',
                 buttons=[
-                    dict(label='sans offset',
+                    dict(label='aucun',
                          method='update',
                          args=[{'visible': [True, False, True]}, {"yaxis": yaxis1_no_shift}]),
-                    dict(label='avec offset',
+                    dict(label='1',
                          method='update',
-                         args=[{'visible': [False, True, True]}, {"yaxis": yaxis1_shift}]),
+                         args=[{'visible': [False, True, True]}, {"yaxis": yaxis1_shift_zoom_1}]),
+                    dict(label='2',
+                         method='update',
+                         args=[{'visible': [False, True, True]}, {"yaxis": yaxis1_shift_zoom_2}]),
+                    dict(label='5',
+                         method='update',
+                         args=[{'visible': [False, True, True]}, {"yaxis": yaxis1_shift_zoom_5}]),
+                    dict(label='10',
+                         method='update',
+                         args=[{'visible': [False, True, True]}, {"yaxis": yaxis1_shift_zoom_10}]),
                 ],
                 active=0,
                 showactive=True,
                 direction="down",
                 x=-0.1,
                 xanchor="left",
-                y=0.52,
+                y=0.57,
                 yanchor="top",
                 bgcolor="white"
+            ),
 
-            ), dict(
-
+            dict(
                 type='dropdown',
                 buttons=[
-                    dict(label='avec ligne',
+                    dict(label='point',
                          method='update',
                          args=[{'mode': ['markers', 'markers', 'markers']}]),
-                    dict(label='sans ligne',
+                    dict(label='ligne',
                          method='update',
-                         args=[{'mode': ['lines+markers','lines+markers', 'lines+markers']}]),
+                         args=[{'mode': ['lines+markers', 'lines+markers', 'lines+markers']}]),
                 ],
                 active=0,
                 showactive=True,
                 direction="down",
                 x=-0.1,
                 xanchor="left",
-                y=0.3,
+                y=0.25,
                 yanchor="top",
                 bgcolor="white"
 
             ),
         ],
     )
+
+    fig.add_annotation(x=-0.1, y=0.32, xanchor='left', yanchor='top',
+                       xref='paper', yref='paper', showarrow=False, align='right',
+                       text="type de tracé")
+
+    fig.add_annotation(x=-0.1, y=0.64, xanchor='left', yanchor='top',
+                       xref='paper', yref='paper', showarrow=False, align='right',
+                       text="zoom")
     return fig
 
 
@@ -243,7 +299,7 @@ def create_map(sensors_data):
         margin={'l': 0, 'b': 0, 'r': 10, 't': 0},
         paper_bgcolor='rgba(245, 250, 245,1)',
         mapbox=dict(
-            style='carto-positron',#'open-street-map',
+            style='carto-positron',  # 'open-street-map',
             center={"lat": 48.8566, "lon": 2.3522},  # Centre de la carte
             zoom=10,  # Niveau de zoom
         ),
@@ -255,9 +311,9 @@ def create_map(sensors_data):
     # dessiner les lignes
     if sensors_data == {}:
         fig.add_trace(go.Scattermapbox())
-    else :
+    else:
         sensors_df = pd.DataFrame(sensors_data)
-        sensors_df["Route"] = sensors_df["Reseau"] +" "+sensors_df["Ligne"].astype(str)
+        sensors_df["Route"] = sensors_df["Reseau"] + " " + sensors_df["Ligne"].astype(str)
         routes_displayed = (sensors_df["Route"]).unique()
         routes_drawn = []
         for feature in ratp_dict['features']:
@@ -295,17 +351,16 @@ def create_map(sensors_data):
             fig.add_trace(
                 go.Scattermapbox(
                     name="",
-                    #name=sensor["Table"],
+                    # name=sensor["Table"],
                     mode="markers",
                     lat=[sensor["Latitude"]],
                     lon=[sensor["Longitude"]],
-                    hoverlabel=dict(bgcolor="black",font=dict(color="white"), namelength=15),
+                    hoverlabel=dict(bgcolor="black", font=dict(color="white"), namelength=15),
                     customdata=[sensor],
                     hovertemplate='<b>%{customdata[0]} </b><br><br>'
                                   'Date de la pose: %{customdata[10]}<br>'
                                   'Modèle: %{customdata[6]}<br>'
                                   'localisation :%{customdata[3]}<br>'
-                                  '%{customdata[4]}<br>'
                                   'pk:%{customdata[5]}<br>'
                                   'Ouverture initiale: %{customdata[12]} mm<br>',
                     marker=dict(

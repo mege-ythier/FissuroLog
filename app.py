@@ -448,7 +448,6 @@ def show_message_upload_image(contents):
 
     Output('store-map-csv', 'data'),
     Output('ingest-card-message', 'children', allow_duplicate=True),
-    # Output('upload-file-dcc', 'contents'),
     Output('dropdown-table', 'value', allow_duplicate=True),
     Input('confirm-throw-ingestion', 'submit_n_clicks'),
     State('store-data-uploaded', 'data'),
@@ -553,10 +552,9 @@ def update_sensors_info(click, sensors_data_stored, table_name, lat, long, pk, d
 
     sensors_df = pd.DataFrame(sensors_data_stored)
     sensors_df = sensors_df.set_index("Table")
-
+    if pk == "": pk = np.float64('nan')
+    if delta == "": delta = np.float64('nan')
     try:
-        if pk == "": pk= np.float64('nan')
-        if delta == "": delta=np.float64('nan')
         float(lat), float(long), float(pk), float(delta)
 
         if date_depose != "":
@@ -644,7 +642,14 @@ def delete_table_final_step(click, table_select, sensors_data):
         cursor = conn.cursor()
         cursor.execute(f"""DROP TABLE IF EXISTS {table_select} """)
         conn.commit()
+        dossier_images_path = f"data_capteur/images/{table_select}"
+        for file in os.listdir(dossier_images_path):
+            images_path = os.path.join(dossier_images_path, file)
+            if os.path.isfile(images_path):
+                # Supprimer le fichier
+                os.remove(images_path)
 
+        os.rmdir(dossier_images_path)
         return sensors_df.to_dict('records'), f'capteur {table_select} supprimé', None
 
 

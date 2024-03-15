@@ -137,23 +137,23 @@ def generate_form_card():
                                     id='textarea-delta',
                                     value=''
                                 ),
-                                html.H5("précision sur la zone"),
-                                dcc.Textarea(
-                                    id='textarea-lieu',
-                                    value=''
-                                ),
 
                                 html.H5("Latitude *"),
                                 dcc.Textarea(
                                     id='textarea-lat',
                                     value=''
                                 ),
+                                html.H5("localisation dans le réseau"),
+                                dcc.Textarea(
+                                    id='textarea-lieu',
+                                    title='Ici tu expliques comment accéder au capteur dans le reseau',
+                                    rows=10),
 
                                 dcc.Upload(
                                     id='upload-image-dcc',
                                     children="télécharger une image",
                                     multiple=False
-                                ),
+                                )
                             ]),
                         html.Div([
                             html.H5("numero du capteur"),
@@ -166,26 +166,32 @@ def generate_form_card():
                                 id='textarea-date-depose',
                                 value=''
                             ),
-                            html.H5("zone du capteur *"),
+                            html.H5("localisation dans l'ouvrage *"),
                             dcc.Textarea(
                                 id='textarea-zone',
-                                value=''
+                                value='',
+                                maxLength=20,
+                                title='voute, piedroit .....'
                             ),
-
-                            html.H5("pk de la zone"),
-                            dcc.Textarea(
-                                id='textarea-pk',
-                                value=''
-                            ),
-
                             html.H5("Longitude *"),
                             dcc.Textarea(
                                 id='textarea-long',
                                 value=''
                             ),
 
-                            html.Br(),
+                            html.H5("pk"),
+                            dcc.Textarea(
+                                id='textarea-pk',
+                                value=''
+                            ),
 
+                            html.H5("commentaires"),
+                            dcc.Textarea(
+                                id='textarea-divers',
+                                rows=7,
+                            ),
+
+                            html.Br(),
                             html.P("", id="text-error-upload-image"),
                         ]),
                         dcc.Store(id="store-metadata-to-ingest", data={}),
