@@ -93,7 +93,7 @@ def parse_file_and_update_ingest_card(contents, filename):
 
                 False,  # button-ingest
                 f"",  # textarea-model
-                "erreur dans le parsing",  # ingest-card-message
+                "erreur dans le parsing",  # ingest-message
             )
 
 
@@ -102,8 +102,7 @@ def parse_file_and_update_ingest_card(contents, filename):
                 df.drop("Date", axis=1).to_dict('records'),  # store-data-uploaded'
                 # upload-card-inner
                 html.Div([
-                    html.H3("Information sur le fichier téléchargé"),
-                    html.H4(f"Le fichier {filename} contient la table suivante."),
+                    html.H4(f"fichier {filename} téléchargé"),
                     DataTable(
                         data=df.drop("unix", axis=1).to_dict('records'),
                         columns=[{'name': i, 'id': i} for i in df.drop("unix", axis=1).columns],
@@ -113,7 +112,7 @@ def parse_file_and_update_ingest_card(contents, filename):
                 ]),
                 False,  # button-card
                 f"{provider}",  # textarea-sensor-model
-                "",  # ingest-card-message
+                "Tu peux lancer l'intégration des mesures téléchargées à la database en appuyant sur le bouton correspond.",  # ingest-message
 
             )
 

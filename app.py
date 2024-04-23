@@ -1,4 +1,5 @@
 import base64
+import logging
 import sqlite3
 from datetime import datetime
 import re
@@ -9,7 +10,7 @@ from dash import Dash, html, dcc, Input, Output, callback, State
 from dash.exceptions import PreventUpdate
 import pandas as pd
 
-from card_module import generate_options_card, generate_map_card, generate_time_series_card, generate_upload_card, fig0, \
+from card_module import generate_options_card, generate_time_series_card, generate_upload_card, fig0, \
     generate_form_card, generate_button_card, generate_message_card
 from ingest_module import save_in_database
 from ingest_module import parse_file_and_update_ingest_card
@@ -18,13 +19,22 @@ from fig_module import create_time_series_fig, create_map
 app = Dash(__name__)
 server = app.server
 
-# initialisation des données
+# Création d'un objet journal
 
+logging.basicConfig(filename='app.log', encoding='utf-8', level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+logger.addHandler(ch)
+logger.info('info debut du loggin')
+# definition de la mise en page de l'application
 app.layout = html.Div(
     id='app-container',
     children=[
         html.Header(
-            children=[html.Img(src='assets/logo_ratp.png', width='20%', style={'float': 'right'}),
+            children=[html.Img(src='assets/logo_ratp.png', width='15%', style={'float': 'right'}),
                       html.H1("Fissuro logger")
                       ],
             className="header"),
@@ -36,33 +46,25 @@ app.layout = html.Div(
                 dcc.Store(id='store-map-csv'),
 
                 html.Div(
-                    id='select-data-card', children=[
+                    id='data-card', children=[
+                        generate_button_card(),
+                        generate_upload_card(),
                         html.Div(
-                            id='button_update_fig_card',
-                            children=html.Button(id='button_update_fig', hidden=True, title='charger les mesures')),
-                        html.Div(
-                            id='vertical-card',
+                            id='select-data-card',
                             children=[
                                 generate_options_card(),
-                                generate_map_card(create_map({})),
-                                html.H3(id='fig-message', children="click sur la carte"),
-                            ]
-                        ),
-                        html.Div(id='image-card')]
-                ),
+                                dcc.Graph(id='map',
+                                          config={'displaylogo': False, 'doubleClickDelay': 1000},
+                                          figure=create_map({}))
+                            ]),
 
-                generate_time_series_card(),
-
-                html.Div(
-                    id='ingest-card',
-                    children=[
-                        generate_button_card(),
                         generate_form_card(),
-                        generate_upload_card(),
-                        generate_message_card()
+
 
                     ]
                 ),
+                generate_message_card(),
+                generate_time_series_card(),
 
                 html.Div(id='ingest-info'),
                 dcc.ConfirmDialog(
@@ -95,7 +97,7 @@ def update_line_in_control_card(net_value, selected_data):
         line_options += ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14"]
     if "TRAM" in net_value:
         line_options += ["1", "2", "3,""4", "5", "6", "7", "8", "9", "10"]
-
+    logger.info(f"le reseau {net_value} selectionné")
     if selected_data is None or (selected_data and 'points' in selected_data.keys() and selected_data['points'] == []):
         return line_options
     else:
@@ -186,7 +188,7 @@ def update_control_card_with_click_on_point_map(click_data):
           prevent_initial_call=True, interval=10000)
 def show_button(start_date, end_date, aggregate, table_value):
     if table_value:
-        return False, "Appuies sur le bouton pour mettre à jour les données"
+        return False, "Appuies sur le bouton pour mettre à jour le graphique."
     else:
         raise PreventUpdate
 
@@ -232,7 +234,8 @@ def encode_image(image_path):
 def update_with_table_changes(n_clicks, table_name, start_date, end_date, aggregate, data, model0):
     store = {}
     fig = fig0
-    fig_message = "aucune donnée"
+    fig_message = ("Aucun capteur n'est sélectionné. Click sur la carte pour sélectionner un capteur existant."
+                   " Tu peux aussi ajouter un nouveau capteur.")
     image_card = html.H3("")
     model, num, zone, pk, place, lat, long, date_pose, date_depose, delta, divers = model0, "", "", "", "", "", "", "", "", "", ""
     button_update_metadata_is_hidden, button_delete_table_is_hidden = True, True
@@ -289,7 +292,8 @@ def update_with_table_changes(n_clicks, table_name, start_date, end_date, aggreg
         if size_on_memory <= 200000:
             store = df.to_dict('records')
             fig = create_time_series_fig(df, table_name, delta)
-            fig_message = "données du graphe à jour"
+            fig_message = ("Un capteur est sélectionné. Ses mesures sont affichées sur le graphe."
+                           " Tu peux modifier les informations de ce capteur, ou y ajouter de nouvelles mesures")
 
         try:
             images_path = f'data_capteur/images/{table_name}/'
@@ -301,6 +305,7 @@ def update_with_table_changes(n_clicks, table_name, start_date, end_date, aggreg
             image_card = html.H3("il n'y a pas encore d'image du capteur dans les données du dashboard"),
         else:
             image_card = html.Img(src=encode_image(image_displayed), width='100%'),
+            carousel_card = [image_card]
 
     return (store, fig, True, fig_message,
             image_card, str(model), str(num), zone, place, str(pk), str(lat), str(long), str(date_pose),
@@ -313,7 +318,7 @@ def update_with_table_changes(n_clicks, table_name, start_date, end_date, aggreg
     Output('upload-card-inner', 'children', allow_duplicate=True),
     Output('button-ingest', 'hidden'),
     Output('textarea-model', 'value', allow_duplicate=True),
-    Output('ingest-card-message', 'children', allow_duplicate=True),
+    Output('ingest-message', 'children', allow_duplicate=True),
     Input('upload-file-dcc', 'contents'),
     State('upload-file-dcc', 'filename'), prevent_initial_call=True, interval=10000)
 def ingest_first_step(contents, filename):
@@ -324,7 +329,8 @@ def ingest_first_step(contents, filename):
     Output('confirm-throw-ingestion', 'displayed'),
     Output('confirm-throw-ingestion', 'message'),
     Output('store-metadata-to-ingest', 'data'),
-    Output('ingest-card-message', 'children', allow_duplicate=True),
+    Output('ingest-message', 'children', allow_duplicate=True),
+    Output('upload-card-inner', 'children'),
     Input('button-ingest', 'n_clicks'),
     State('dropdown-table', 'value'),
     State('dropdown-table', 'options'),
@@ -354,10 +360,10 @@ def ingest_middle_step(click, table_select, tables, model, num, net, line, zone,
         raise PreventUpdate
 
     if any(len(value) == 0 for value in [net, line]) and not table_select:
-        ingest_card_message = "La ligne ou le réseau ne sont pas renseignés dans les menus déroulants"
+        ingest_card_message = "ECHEC : La ligne ou le réseau ne sont pas renseignés dans les menus déroulants"
 
     elif any(value == "" for value in [zone, model, lat, long]):
-        ingest_card_message = "Des élements obligatoires ne sont pas renseignés dans le formulaire"
+        ingest_card_message = "ECHEC : Des élements obligatoires ne sont pas renseignés dans le formulaire"
 
     # elif not (re.compile(r'^[a-zA-Z\s]+$').match(zone)):
     #     ingest_card_message = "Le nom de la zone est formé de lettres."
@@ -375,16 +381,16 @@ def ingest_middle_step(click, table_select, tables, model, num, net, line, zone,
         ingest_card_message = f"""Le longitude est un chiffre."""
 
     elif not (re.compile(r'^[a-zA-Z0-9]+$').match(num) or num == ""):
-        ingest_card_message = "Le numéro du capteur comporte uniquement des lettres ou des chiffres."
+        ingest_card_message = "ECHEC : Le numéro du capteur comporte uniquement des lettres ou des chiffres."
 
     elif not (re.compile(r'^\d{2}/\d{2}/\d{4}$').match(date_pose)):
-        ingest_card_message = "Le date de pose est de la forme 01/01/2024."
+        ingest_card_message = "ECHEC : Le date de pose est de la forme 01/01/2024."
 
     elif not (re.compile(r'^\d{2}/\d{2}/\d{4}$').match(date_depose) or date_depose == ""):
-        ingest_card_message = "Le date de dépose est de la forme 01/01/2024."
+        ingest_card_message = "ECHEC : Le date de dépose est de la forme 01/01/2024."
 
     elif any(len(value) > 1 for value in [net, line]):
-        ingest_card_message = "Sélectionne une seule ligne!"
+        ingest_card_message = "ECHEC : Sélectionne une seule ligne!"
 
     elif table_select:
         # on prendre la valeur du reseau et de la ligne dans le store
@@ -428,7 +434,7 @@ Press OK pour lancer l'ingestion.
                 'Latitude': lat, 'Longitude': long, 'Date_pose': date_pose, 'Date_depose': date_depose,
                 'Ouverture_pose': delta, 'Table': table_metadata, 'Divers': divers}
 
-    return confirm_message_is_displayed, confirm_message, metadata, ingest_card_message
+    return confirm_message_is_displayed, confirm_message, metadata, ingest_card_message, ""
 
 
 @callback(Output('text-error-upload-image', 'children'),
@@ -452,7 +458,7 @@ def show_message_upload_image(contents):
 @callback(
 
     Output('store-map-csv', 'data'),
-    Output('ingest-card-message', 'children', allow_duplicate=True),
+    Output('ingest-message', 'children', allow_duplicate=True),
     Output('dropdown-table', 'value', allow_duplicate=True),
     Input('confirm-throw-ingestion', 'submit_n_clicks'),
     State('store-data-uploaded', 'data'),
@@ -465,8 +471,7 @@ def ingest_final_step(click, data, all_metadata, metadata, image_contents):
     if click is None:
         sensors_df = pd.read_csv("data_capteur/map.csv", sep=";")
         return (sensors_df.to_dict('records'),
-                ("Dans le bloc du haut, indique la ligne et le réseau de ton nouveau capteur ou sélectionne un "
-                 "capteur existant."), None)
+                (""), None)
     elif metadata == {}:
         raise PreventUpdate
     else:
@@ -536,7 +541,7 @@ Le capteur {table_name} a mesuré {table_length} ouvertures.
 @callback(
 
     Output('store-map-csv', 'data', allow_duplicate=True),
-    Output('ingest-card-message', 'children', allow_duplicate=True),
+    Output('ingest-message', 'children', allow_duplicate=True),
     Input('button-update-metadata', 'n_clicks'),
     State('store-map-csv', 'data'),
     State('dropdown-table', 'value'),
@@ -634,7 +639,7 @@ def delete_table_first_step(click, table_select, sensors_data):
 
 @callback(
     Output('store-map-csv', 'data', allow_duplicate=True),
-    Output('ingest-card-message', 'children', allow_duplicate=True),
+    Output('ingest-message', 'children', allow_duplicate=True),
     Output('dropdown-table', 'value', allow_duplicate=True),
     Input('confirm-delete-table', 'submit_n_clicks'),
     State('dropdown-table', 'value'),
@@ -668,7 +673,7 @@ def delete_table_final_step(click, table_select, sensors_data):
 
 @callback(Output('map', 'figure'),
           Input('store-map-csv', 'data'),
-          prevent_initial_call=True)
+          prevent_initial_call=True, interval=10000)
 def update_map(sensors_data):
     sensors_df = pd.DataFrame(sensors_data)
     sensors_df.to_csv("data_capteur/map.csv", index=False, sep=";", header=True, mode="w")

@@ -130,7 +130,7 @@ def create_time_series_fig(df, table_name, delta_mm):
     )
 
     fig.update_layout(
-        height=400,
+        height=390,
         margin={'l': 10, 'b': 10, 'r': 10, 't': 60},
         #plot_bgcolor='rgb(245, 250, 245)',
         plot_bgcolor='rgba(0,0,0,0)',

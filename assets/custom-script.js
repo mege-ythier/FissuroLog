@@ -1,2 +1,2 @@
 //alert('If you see this alert, then your custom JavaScript script has run!')
-var config={'displaylogo': False}
+//var config={'displaylogo': False}
