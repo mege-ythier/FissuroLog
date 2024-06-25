@@ -286,7 +286,7 @@ def update_time_series_fig(start_date, end_date, table_name):
     return create_time_series_fig(df_from_sensor_table, table_name)
 
 
-def create_map(sensors_data):
+def create_map(sensors_data:list[dict]):
     with open("data_ratp/traces-du-reseau-de-transport-ferre-ratp.geojson", "r") as lines:
         ratp_dict = json.load(lines)
     with open("data_ratp/couleur-ratp-carte.json", 'r') as files:

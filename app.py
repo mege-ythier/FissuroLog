@@ -1,4 +1,5 @@
 import base64
+import json
 import logging
 import sqlite3
 from datetime import datetime
@@ -7,6 +8,7 @@ import os
 
 import numpy as np
 from dash import Dash, html, dcc, Input, Output, callback, State
+import dash_auth
 from dash.exceptions import PreventUpdate
 import pandas as pd
 
@@ -19,9 +21,16 @@ from fig_module import create_time_series_fig, create_map
 app = Dash(__name__)
 server = app.server
 
-# Création d'un objet journal
+# authentication
+secrets = json.load(open('secrets.json', 'r'))
+auth = dash_auth.BasicAuth(app, secrets, user_groups={"hello": ["group1", "group2"], "user": ["group2"],})
 
-logging.basicConfig(filename='app.log', encoding='utf-8', level=logging.INFO,
+
+
+# Création d'un objet journal
+log_name = f'{datetime.now().strftime("%Y-%m-%d")}.log'
+
+logging.basicConfig(filename=log_name, encoding='utf-8', level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -29,6 +38,7 @@ ch = logging.StreamHandler()
 ch.setLevel(logging.DEBUG)
 logger.addHandler(ch)
 logger.info('info debut du loggin')
+
 # definition de la mise en page de l'application
 app.layout = html.Div(
     id='app-container',
@@ -59,7 +69,6 @@ app.layout = html.Div(
                             ]),
 
                         generate_form_card(),
-
 
                     ]
                 ),
@@ -97,7 +106,7 @@ def update_line_in_control_card(net_value, selected_data):
         line_options += ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14"]
     if "TRAM" in net_value:
         line_options += ["1", "2", "3,""4", "5", "6", "7", "8", "9", "10"]
-    logger.info(f"le reseau {net_value} selectionné")
+    logger.info(f"selection du reseau {net_value}")
     if selected_data is None or (selected_data and 'points' in selected_data.keys() and selected_data['points'] == []):
         return line_options
     else:
