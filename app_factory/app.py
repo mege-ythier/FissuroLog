@@ -8,7 +8,6 @@ import os
 
 import numpy as np
 from dash import Dash, html, dcc, Input, Output, callback, State
-import dash_auth
 from dash.exceptions import PreventUpdate
 import pandas as pd
 
@@ -18,33 +17,21 @@ from ingest_module import save_in_database
 from ingest_module import parse_file_and_update_ingest_card
 from fig_module import create_time_series_fig, create_map
 
+import logging.config
+
 app = Dash(__name__)
-server = app.server
-
-# authentication
-secrets = json.load(open('secrets.json', 'r'))
-auth = dash_auth.BasicAuth(app, secrets, user_groups={"hello": ["group1", "group2"], "user": ["group2"],})
-
-
 
 # Création d'un objet journal
-log_name = f'{datetime.now().strftime("%Y-%m-%d")}.log'
-
-logging.basicConfig(filename=log_name, encoding='utf-8', level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s')
+logging.config.fileConfig('../logging.conf', disable_existing_loggers=True)
 logger = logging.getLogger(__name__)
-
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-logger.addHandler(ch)
-logger.info('info debut du loggin')
+logger.info('info debut du logging')
 
 # definition de la mise en page de l'application
 app.layout = html.Div(
     id='app-container',
     children=[
         html.Header(
-            children=[html.Img(src='assets/logo_ratp.png', width='15%', style={'float': 'right'}),
+            children=[html.Img(src='../data_ratp/logo_ratp.png', width='15%', style={'float': 'right'}),
                       html.H1("Fissuro logger")
                       ],
             className="header"),
@@ -276,7 +263,7 @@ def update_with_table_changes(n_clicks, table_name, start_date, end_date, aggreg
 
         start_date_timestamp = datetime.strptime(start_date, "%Y-%m-%d").timestamp()
         end_date_timestamp = datetime.strptime(end_date, "%Y-%m-%d").timestamp()
-        conn = sqlite3.connect('data_capteur/database.db')
+        conn = sqlite3.connect('../data_capteur/database.db')
         query = f"""
         SELECT strftime('%Y-%m-%d %H:%M:%S', datetime(unix,'unixepoch')) AS Date,mm,°C
         FROM {table_name}
@@ -478,7 +465,7 @@ def ingest_final_step(click, data, all_metadata, metadata, image_contents):
     image_upload_info = ["aucune image uploadée"]
     # quand on lance l'appli le submit_n_clicks de confirm-throw-ingestion prend la valeur None et donc il y a un call
     if click is None:
-        sensors_df = pd.read_csv("data_capteur/map.csv", sep=";")
+        sensors_df = pd.read_csv("../data_capteur/map.csv", sep=";")
         return (sensors_df.to_dict('records'),
                 (""), None)
     elif metadata == {}:
@@ -491,7 +478,7 @@ def ingest_final_step(click, data, all_metadata, metadata, image_contents):
         save_in_database(df, table_name)
 
         # extraire des infos de la table ingérée
-        conn = sqlite3.connect('data_capteur/database.db')
+        conn = sqlite3.connect('../data_capteur/database.db')
         cursor = conn.cursor()
         cursor.execute(f"SELECT COUNT(*) FROM {table_name};")
         table_length = cursor.fetchone()[0]
@@ -530,7 +517,7 @@ Le capteur {table_name} a mesuré {table_length} ouvertures.
                 raise ValueError("Erreur : le fichier n'est pas une image au format png")
             decoded = base64.b64decode(content_string)
             images_path = f"data_capteur/images/{table_name}"
-            if table_name not in os.listdir("data_capteur/images"): os.makedirs(images_path)
+            if table_name not in os.listdir("../data_capteur/images"): os.makedirs(images_path)
 
             images_name_file = os.listdir(images_path)
             images_number = [int(x.split(".")[0]) for x in images_name_file]
@@ -615,7 +602,7 @@ def update_sensors_info(click, sensors_data_stored, table_name, lat, long, pk, d
             content_format, content_string = image_contents.split(',')
             decoded = base64.b64decode(content_string)
             images_path = f"data_capteur/images/{table_name}"
-            if table_name not in os.listdir("data_capteur/images"): os.makedirs(images_path)
+            if table_name not in os.listdir("../data_capteur/images"): os.makedirs(images_path)
             images_name_file = os.listdir(images_path)
             images_number = [int(x.split(".")[0]) for x in images_name_file]
             image_number = 1
@@ -665,7 +652,7 @@ def delete_table_final_step(click, table_select, sensors_data):
         sensors_df.drop(table_select, inplace=True, axis=0)
         sensors_df.reset_index(inplace=True)
 
-        conn = sqlite3.connect('data_capteur/database.db')
+        conn = sqlite3.connect('../data_capteur/database.db')
         cursor = conn.cursor()
         cursor.execute(f"""DROP TABLE IF EXISTS {table_select} """)
         conn.commit()

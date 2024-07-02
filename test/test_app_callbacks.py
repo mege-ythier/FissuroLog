@@ -1,14 +1,14 @@
 import pandas as pd
 import base64
-from app import ingest_final_step
-from app import parse_file_and_update_ingest_card
-from app import ingest_middle_step
-from app import delete_table_final_step
-from app import update_map
+from app_factory.app import ingest_final_step
+from app_factory.app import parse_file_and_update_ingest_card
+from app_factory.app import ingest_middle_step
+from app_factory.app import delete_table_final_step
+from app_factory.app import update_map
 
 
 def test_ingest_middle_step():
-    sensors_df = pd.read_csv("data_capteur/map.csv", sep=";")
+    sensors_df = pd.read_csv("../data_capteur/map.csv", sep=";")
     sensors = sensors_df.to_dict('records')
 
     confirm_message_is_displayed, confirm_message, metadata, ingest_card_message = ingest_middle_step(click=1,
@@ -42,16 +42,16 @@ def test_ingest_middle_step():
 
 
 def test_ingest_first_step():
-    with open('test/2022-SITES-2565.txt', 'r') as f:
+    with open('2022-SITES-2565.txt', 'r') as f:
         file_content = f.read()
     # Encoder le contenu en base64
     encoded_content = base64.b64encode(file_content.encode()).decode()
-    data, _, _, model, _ = parse_file_and_update_ingest_card('data:text/plain;base64,' + encoded_content, "test")
+    data, _, _, model, _ = parse_file_and_update_ingest_card('data:text/plain;base64,' + encoded_content, "")
     assert model == "Sites1D"
 
 
 def test_ingest_final_step():
-    all_metadata_df = pd.read_csv("data_capteur/map.csv", sep=";")
+    all_metadata_df = pd.read_csv("../data_capteur/map.csv", sep=";")
     all_metadata = all_metadata_df.to_dict('records')
 
     metadata = dict(Table='test', Reseau="METRO", Ligne='14',
@@ -59,11 +59,11 @@ def test_ingest_final_step():
                     Zone='raccord', Lieu='raccord',
                     Latitude='48.8390224', Longitude='2.3001811',
                     Date_depose='', Date_pose='24/02/2022', Ouverture_pose='-4')
-    with open('test/2022-SITES-2565.txt', 'r') as f:
+    with open('2022-SITES-2565.txt', 'r') as f:
         file_content = f.read()
     # Encoder le contenu en base64
     encoded_content = base64.b64encode(file_content.encode()).decode()
-    data, _, _, model, _ = parse_file_and_update_ingest_card('data:text/plain;base64,' + encoded_content, "test")
+    data, _, _, model, _ = parse_file_and_update_ingest_card('data:text/plain;base64,' + encoded_content, "")
 
     all_metadata_with_new_sensors,_,_ = ingest_final_step(click=1, data=data, all_metadata=all_metadata,
                                                             metadata=metadata, image_contents=None)

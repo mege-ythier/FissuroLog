@@ -6,7 +6,7 @@ from dateutil.relativedelta import relativedelta
 from datetime import datetime
 import json
 
-with open("data_ratp/traces-du-reseau-de-transport-ferre-ratp.geojson", "r") as lines:
+with open("./data_ratp/traces-du-reseau-de-transport-ferre-ratp.geojson", "r") as lines:
     ratp_dict = json.load(lines)
 
 all_lines = ["all"]
@@ -44,12 +44,13 @@ def generate_options_card():
     return html.Div(
         id='options-card',
         children=[
-            dcc.Store(id='store-time-serie'),
+
 
             html.H2("capteur"),
-            dcc.Dropdown(
+            dcc.Textarea(
                 id='dropdown-table',
-                multi=False,
+                value='',
+                #multi=False,
                 style={'minWidth': '200px'},
                 disabled=True
             ),
@@ -205,10 +206,19 @@ def generate_button_card():
         id="button-card",
         children=[
             html.Button(id='button_update_fig', hidden=True, title='charger les mesures'),
-            html.Button(id='button-ingest', hidden=True, title='intégrer les mesures dans la database'),
+            html.Button(id='button-ingest', hidden=False, title='intégrer les mesures dans la database'),
             html.Button(title='Supprimer le capteur',
                         id='button-delete-table', hidden=True, ),
             html.Button(title='modifier les informations du capteur', id='button-update-metadata', hidden=True),
+
+        ])
+
+def generate_button_guest_card():
+    return html.Div(
+        id="button-card",
+        children=[
+            html.Button(id='button_update_fig', hidden=True, title='charger les mesures'),
+
 
         ])
 

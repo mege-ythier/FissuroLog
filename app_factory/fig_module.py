@@ -273,7 +273,7 @@ def update_time_series_fig(start_date, end_date, table_name):
     end_date_timestamp = end_date.timestamp()
 
     # charger les données
-    conn = sqlite3.connect('data_capteur/database.db')
+    conn = sqlite3.connect('../data_capteur/database.db')
     query = f"SELECT * from {table_name} WHERE unix > {start_date_timestamp} and unix < {end_date_timestamp}"
     df_from_sensor_table = pd.read_sql_query(query, conn)
     conn.close()
@@ -287,9 +287,9 @@ def update_time_series_fig(start_date, end_date, table_name):
 
 
 def create_map(sensors_data:list[dict]):
-    with open("data_ratp/traces-du-reseau-de-transport-ferre-ratp.geojson", "r") as lines:
+    with open("./data_ratp/traces-du-reseau-de-transport-ferre-ratp.geojson", "r") as lines:
         ratp_dict = json.load(lines)
-    with open("data_ratp/couleur-ratp-carte.json", 'r') as files:
+    with open("./data_ratp/couleur-ratp-carte.json", 'r') as files:
         color_dict = json.load(files)
 
     fig = go.Figure()
@@ -309,7 +309,7 @@ def create_map(sensors_data:list[dict]):
         clickmode='event+select')
 
     # dessiner les lignes
-    if sensors_data == {}:
+    if sensors_data == []:
         fig.add_trace(go.Scattermapbox())
     else:
         sensors_df = pd.DataFrame(sensors_data)

@@ -119,7 +119,7 @@ def parse_file_and_update_ingest_card(contents, filename):
 
 def save_in_database(df, sensor_table):
     # Create sqlite database and cursor
-    conn = sqlite3.connect('data_capteur/database.db')
+    conn = sqlite3.connect('./data_capteur/database.db')
     cursor = conn.cursor()
     cursor.execute(f"""CREATE TABLE IF NOT EXISTS {sensor_table} (
                         mm real,
