@@ -41,7 +41,7 @@ class Sensor(db.Model):
 
     __tablename__ = "sensors_tb"
 
-    Table = db.Column(db.String(50), primary_key=True)
+    Id = db.Column(db.String(5), primary_key=True)
     Num = db.Column(db.String(10))
     Modele = db.Column(db.String(10))
     Reseau = db.Column(db.String(5), )
@@ -55,5 +55,16 @@ class Sensor(db.Model):
     Date_depose = db.Column(db.DateTime)
     Ouverture_pose = db.Column(db.Float)
     Divers = db.Column(db.String(1000))
+
+    # Relation avec SensorImage
+    Images = db.relationship('SensorImage', backref='sensor', lazy=True)
+
+
+class SensorImage(db.Model):
+    __tablename__ = "sensor_images"
+    id = db.Column(db.Integer, primary_key=True)
+    sensor_id = db.Column(db.String(5), db.ForeignKey('sensors_tb.Id'), nullable=False)
+    name = db.Column(db.String(150), nullable=False)
+    data = db.Column(db.LargeBinary, nullable=False)
 
 

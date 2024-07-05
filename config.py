@@ -14,11 +14,12 @@ class Config:
     """Set Flask configuration from environment variables."""
 
     # General Config
-    ENVIRONMENT = environ.get("ENVIRONMENT")
+    #ENVIRONMENT = environ.get("ENVIRONMENT")
 
     # Flask Config
+    FLASK_ENV= environ.get("FLASK_ENV")
     FLASK_APP = "wsgi.py"
-    DEBUG = environ.get("FLASK_DEBUG")
+    DEBUG = True if environ.get("FLASK_DEBUG") == 'True' else False
     SECRET_KEY = environ.get("SECRET_KEY")
 
 
@@ -29,5 +30,9 @@ class Config:
 
     # Static Assets
     STATIC_FOLDER = "static"
-    #TEMPLATES_FOLDER = "templates"
+    TEMPLATES_FOLDER = "templates"
     COMPRESSOR_DEBUG = False
+
+    # dash
+    DASH_DEBUG = True if environ.get("DASH_DEBUG") == 'True' else False
+    DASH_AUTO_RELOAD = True if environ.get("DASH_AUTO_RELOAD") == 'True' else False

@@ -5,6 +5,7 @@ from logging.handlers import RotatingFileHandler
 from logging.handlers import TimedRotatingFileHandler
 
 from datetime import datetime
+from os import environ
 
 from dash import Dash
 from flask import Flask, render_template, redirect, url_for
@@ -14,16 +15,14 @@ from flask_sqlalchemy import SQLAlchemy
 from flask import Blueprint
 
 
-
 bp = Blueprint('main_blueprint', __name__, static_folder='static', template_folder='template')
 from . import routes
-
 
 
 db = SQLAlchemy()
 login_manager = LoginManager()
 
-def create_app(dash_debug, dash_auto_reload):
+def create_app():
     """Construct core Flask application."""
 
     # Création d'un objet journal create logger
@@ -33,11 +32,15 @@ def create_app(dash_debug, dash_auto_reload):
     logger.debug('debug message debut application')
 
     app = Flask(__name__, instance_relative_config=False)
+
+    #fonfigure flask app et sql alchemy
     app.config.from_object('config.Config')
 
-    # Initialize Plugins
     login_manager.init_app(app)
+
     db.init_app(app)
+
+
 
     with app.app_context():
         # Import parts of our core Flask app_factory
@@ -54,51 +57,52 @@ def create_app(dash_debug, dash_auto_reload):
         # Create Database Models
         db.create_all()
 
+        dash_debug = app.config["DASH_DEBUG"]
+        dash_auto_reload = app.config["DASH_AUTO_RELOAD"]
         meta_viewport = {"name": "viewport", "content": "width=device-width, initial-scale=1, shrink-to-fit=no"}
 
-        from .guest.layout import layout as guest_layout
-        from .guest.callbacks import register_callbacks as guest_callbacks
-        dash_app_fissurolog_guest = Dash(
-            __name__,
-            server=app,
-            url_base_pathname='/dash_fissurolog_guest/',
-            # assets_folder=get_root_path(__name__) + '/static/',
-            meta_tags=[meta_viewport],
-            # external_stylesheets=[],
-            # external_scripts=[],
-            #suppress_callback_exceptions=False
-        )
 
-        dash_app_fissurolog_guest.title = "App Fissurolog guest"
-        dash_app_fissurolog_guest.layout = guest_layout
-        dash_app_fissurolog_guest.css.config.serve_locally = True
-        dash_app_fissurolog_guest.enable_dev_tools(debug=dash_debug, dev_tools_hot_reload=dash_auto_reload)
-        for call_back_func in [guest_callbacks]:
-            call_back_func(dash_app_fissurolog_guest)
-
-
-        from .owner.layout import layout as owner_layout
-        from .owner.callbacks import register_callbacks as owner_callbacks
         dash_app_fissurolog_owner = Dash(
             __name__,
             server=app,
+            title="App Fissurolog owner",
             url_base_pathname='/dash_fissurolog_owner/',
             # assets_folder=get_root_path(__name__) + '/static/',
             meta_tags=[meta_viewport],
             # external_stylesheets=[],
             # external_scripts=[],
-            #suppress_callback_exceptions=False
-
-
+            #suppress_callback_exceptions=False,
+            serve_locally=True
         )
-
-        dash_app_fissurolog_owner.title = "App Fissurolog owner"
+        from .owner.layout import layout as owner_layout
         dash_app_fissurolog_owner.layout = owner_layout
-        dash_app_fissurolog_owner.css.config.serve_locally = True
+
+        from .owner.callbacks import register_callbacks as callbacks
+        from .owner.callbacks import register_owner_callbacks as owner_callbacks
         dash_app_fissurolog_owner.enable_dev_tools(debug=dash_debug, dev_tools_hot_reload=dash_auto_reload)
-        for call_back_func in [owner_callbacks]:
+        for call_back_func in [callbacks, owner_callbacks]:
             call_back_func(dash_app_fissurolog_owner)
 
+
+
+        dash_app_fissurolog_guest = Dash(
+            __name__,
+            server=app,
+            title="App Fissurolog guest",
+            url_base_pathname='/dash_fissurolog_guest/',
+            # assets_folder=get_root_path(__name__) + '/static/',
+            meta_tags=[meta_viewport],
+            # external_stylesheets=[],
+            # external_scripts=[],
+            #suppress_callback_exceptions=False,
+            serve_locally=True
+        )
+
+        from .guest.layout import layout as guest_layout
+        dash_app_fissurolog_guest.layout = guest_layout
+        dash_app_fissurolog_guest.enable_dev_tools(debug=dash_debug, dev_tools_hot_reload=dash_auto_reload)
+        for call_back_func in [callbacks]:
+            call_back_func(dash_app_fissurolog_guest)
 
 
         return app

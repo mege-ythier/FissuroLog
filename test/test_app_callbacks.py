@@ -1,10 +1,10 @@
 import pandas as pd
 import base64
-from app_factory.app import ingest_final_step
-from app_factory.app import parse_file_and_update_ingest_card
-from app_factory.app import ingest_middle_step
-from app_factory.app import delete_table_final_step
-from app_factory.app import update_map
+from app_factory.old_app import ingest_final_step
+from app_factory.old_app import parse_file_and_update_ingest_card
+from app_factory.old_app import ingest_middle_step
+from app_factory.old_app import delete_table_final_step
+from app_factory.old_app import update_map
 
 
 def test_ingest_middle_step():

@@ -1,7 +1,7 @@
 """Application entry point."""
 from app_factory import create_app
 
-app = create_app(True,True)
+app = create_app()
 
 
 if __name__ == "__main__":

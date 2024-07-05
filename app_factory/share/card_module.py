@@ -229,5 +229,6 @@ def generate_message_card():
         children=[
             html.H3(id='fig-message'),
             html.H3(id='ingest-message'),
+            html.H3(id='database-message'),
 
         ])

@@ -5,7 +5,7 @@ import json
 
 # importation des metadata
 def create_time_series_fig(df, table_name, delta_mm):
-    title = f"table affichée: {table_name}"
+    title = f"capteur: {table_name}"
 
     fig = go.Figure()
 
@@ -38,7 +38,7 @@ def create_time_series_fig(df, table_name, delta_mm):
                              )
                   )
 
-    fig.add_trace(go.Scatter(y=df["°C"],
+    fig.add_trace(go.Scatter(y=df["celsius"],
                              x=df.index,
                              name="température",
                              yaxis="y2",
@@ -273,7 +273,7 @@ def update_time_series_fig(start_date, end_date, table_name):
     end_date_timestamp = end_date.timestamp()
 
     # charger les données
-    conn = sqlite3.connect('../data_capteur/database.db')
+    conn = sqlite3.connect('../../data_capteur/database.db')
     query = f"SELECT * from {table_name} WHERE unix > {start_date_timestamp} and unix < {end_date_timestamp}"
     df_from_sensor_table = pd.read_sql_query(query, conn)
     conn.close()
@@ -286,7 +286,7 @@ def update_time_series_fig(start_date, end_date, table_name):
     return create_time_series_fig(df_from_sensor_table, table_name)
 
 
-def create_map(sensors_data:list[dict]):
+def create_map(sensors_data: list[dict], sensor_index):
     with open("./data_ratp/traces-du-reseau-de-transport-ferre-ratp.geojson", "r") as lines:
         ratp_dict = json.load(lines)
     with open("./data_ratp/couleur-ratp-carte.json", 'r') as files:
@@ -379,6 +379,7 @@ def create_map(sensors_data:list[dict]):
                         color='black',
                         opacity=0.3
                     )),
+                    selectedpoints=[0] if i == sensor_index else [],
 
                     legendgroup=sensor["Route"],
                     legendgrouptitle={"font": {"color": "blue", "family": "Arial", "size": 3}, "text": "test"},
