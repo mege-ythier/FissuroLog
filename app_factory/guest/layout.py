@@ -14,7 +14,7 @@ layout = html.Div(
             html.Header(
                 id='app-container-header',
                 children=[
-                    html.Img(src='/static/dist/img/logo_ratp_infra_pour_dash.png', width='15%', style={'float': 'right'}),
+                    html.Img(src='/static/img/logo_ratp_infra_pour_dash.png', width='15%', style={'float': 'right'}),
                     html.H1(id='welcome-info'),
                     dcc.Location(id='url', refresh=False)],
                 className="header"),

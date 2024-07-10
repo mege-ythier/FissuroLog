@@ -126,36 +126,10 @@ def parse_file_and_update_ingest_card(contents, filename):
 
 
 
-
-def save_in_database(df, sensor_table):
-    # Create sqlite database and cursor
-    conn = sqlite3.connect('./data_capteur/database.db')
-    cursor = conn.cursor()
-    cursor.execute(f"""CREATE TABLE IF NOT EXISTS {sensor_table} (
-                        mm real,
-                        °C real,
-                        unix INTEGER PRIMARY KEY
-                        )""")
-    conn.commit()
-
-    for index, row in df.iterrows():
-        conn.execute(f"INSERT OR IGNORE INTO {sensor_table} VALUES (?, ?, ?)",
-                     (row['mm'], row['°C'], row['unix']))
-
-    conn.commit()
-
-    conn.close()
-
-    return {}
-
-
-
 def save_sensors_info(db, sensors_json, new_sensor_dict):
-
     sensors_dtype = {'Id': str, 'Num': str, 'Modele': str, 'Reseau': str, 'Ligne': str, 'Zone': str, 'Lieu': str,
-                         'pk': np.float64, 'Latitude': np.float64, 'Longitude': np.float64, 'Date_pose': str,
-                         'Date_depose': str, 'Ouverture_pose': np.float64, 'Divers': str}
-
+                     'pk': np.float64, 'Latitude': np.float64, 'Longitude': np.float64, 'Date_pose': str,
+                     'Date_depose': str, 'Ouverture_pose': np.float64, 'Divers': str}
 
     sensors_df = pd.DataFrame(data=sensors_json, columns=sensors_dtype.keys())
     sensors_df = sensors_df.astype(sensors_dtype)
@@ -211,14 +185,22 @@ def save_sensors_info(db, sensors_json, new_sensor_dict):
 
 
 def save_old_sensors_info(db, sensors_df, new_sensor_dict):
-
-
     # le sensor mis a jour
     sensor_id = new_sensor_dict["Id"]
 
-    # dans le store
+
+
+    sensors_dtype = {'Id': str, 'Num': str, 'Modele': str, 'Reseau': str, 'Ligne': str, 'Zone': str,
+                     'Lieu': str,
+                     'pk': np.float64, 'Latitude': np.float64, 'Longitude': np.float64, 'Date_pose': str,
+                     'Date_depose': str, 'Ouverture_pose': np.float64, 'Divers': str}
+
+    sensors_df = sensors_df.astype(sensors_dtype)
     sensors_df.set_index('Id', inplace=True)
-    sensors_df.loc[sensor_id, :] = pd.Series(new_sensor_dict)  # new #A VERIFIER pour la colonne id
+
+
+    sensors_df.loc[sensor_id, :] = pd.Series(new_sensor_dict,dtype=object)  # new #A VERIFIER pour la colonne id
+
     sensors_df.reset_index(inplace=True)
     sensors_json = sensors_df.to_dict("records")
 
@@ -234,8 +216,6 @@ def save_old_sensors_info(db, sensors_df, new_sensor_dict):
 
 
 def save_new_sensors_info(db, sensors_json, new_sensor_dict):
-
-    # BUG PREMIERE INJECTION
     sensors_json.append(new_sensor_dict)
 
     sensor = Sensor(
@@ -262,30 +242,29 @@ def save_new_sensors_info(db, sensors_json, new_sensor_dict):
     return sensors_json
 
 
-def save_image_in_database(image_uploaded, db, sensor_id: str):
+def save_image_in_database(image_uploaded, image_name, db, sensor_id: str):
     if image_uploaded:
 
         try:
-
-            # AVOIR si on le laiise la
+            # a ameliorer
             content_format, content_string = image_uploaded.split(',')
             if content_format != "data:image/png;base64":
                 raise ValueError("Erreur : le fichier n'est pas une image au format png")
             decoded = base64.b64decode(content_string)
 
-        except (AttributeError, ValueError):
-            image_uploaded_info = [" echec de l'intégration de l'image"]
+        except (AttributeError, ValueError) as e:
+            image_uploaded_info = [f"# information sur l'intégration des images: {e}"]
         else:
 
             image = SensorImage(
-                name="monnom",
+                name=image_name,
                 sensor_id=sensor_id,
                 data=decoded
             )
             db.session.add(image)
             db.session.commit()
-            image_uploaded_info = [" succes de l'intégration de l'image"]
+            image_uploaded_info = [f"# information sur l'intégration des images: succes {image_name}"]
     else:
-        image_uploaded_info = [" aucune image uploadée"]
+        image_uploaded_info = ["# information sur l'intégration des images:  aucun fichier téléchargé par l'utilisateur"]
 
     return image_uploaded_info

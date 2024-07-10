@@ -44,7 +44,7 @@ class Sensor(db.Model):
     Id = db.Column(db.String(5), primary_key=True)
     Num = db.Column(db.String(10))
     Modele = db.Column(db.String(10))
-    Reseau = db.Column(db.String(5), )
+    Reseau = db.Column(db.String(5))
     Ligne = db.Column(db.String(4))
     Zone = db.Column(db.String(20))
     Lieu = db.Column(db.String(20))

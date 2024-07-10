@@ -1,20 +1,19 @@
 import base64
 from datetime import datetime
 import re
-import os
 
 import numpy as np
 from dash import html, Input, Output, State
 from dash.exceptions import PreventUpdate
 import pandas as pd
 
-from flask_login import current_user
+from flask_login import current_user, login_required
 from sqlalchemy import update, text, desc
 
 from app_factory.share.card_module import fig0
 from app_factory.owner.ingest_module import parse_file_and_update_ingest_card, save_image_in_database, \
     save_new_sensors_info, save_old_sensors_info
-from app_factory.share.fig_module import create_time_series_fig, create_map
+from app_factory.share.fig_module import create_time_series_fig, create_map, query_time_series_data_and_create_fig
 
 from app_factory.models import Sensor, SensorImage
 from app_factory import db
@@ -53,13 +52,13 @@ def register_callbacks(dash_app):
 
         if selected_data and 'points' in selected_data.keys() and selected_data['points'] != []:
             # premier point selectionné,id est la premiere valeur
-            id_selected = selected_data['points'][0]['customdata'][0]
+            selected_sensor_id = selected_data['points'][0]['customdata'][0]
             sensors_df = pd.DataFrame(sensors_json)
-            selected_point_index = sensors_df.loc[sensors_df.Id == id_selected].index[0]
+            if sensors_df.shape[0] > 0:
+                index = sensors_df.loc[sensors_df.Id == selected_sensor_id].index
+                selected_point_index = -1 if len(index) == 0 else index[0]
 
         return create_map(sensors_json, selected_point_index)
-
-        # attention quand on ajoute une image ou des données les cards ne sont pas mis a jours
 
     @dash_app.callback(
         Output('dropdown-line', 'options'),
@@ -89,7 +88,7 @@ def register_callbacks(dash_app):
             raise PreventUpdate
 
     @dash_app.callback(
-        Output('graph-time-series', 'figure'),
+        Output('graph-time-series', 'figure', allow_duplicate=True),
         Output('button_update_fig', 'hidden', allow_duplicate=True),
         Output('fig-message', 'children', allow_duplicate=True),
         Output('image-card', 'children'),
@@ -107,39 +106,39 @@ def register_callbacks(dash_app):
         Output('dropdown-net', "value"),  # new
         Output('dropdown-line', "value"),  # new
         Output('dropdown-table', "value"),
-        # Input('button_update_fig', 'n_clicks'),
+        Input('button_update_fig', 'n_clicks'),
         Input('map', 'selectedData'),
         State('date-picker-select', "start_date"),
         State('date-picker-select', "end_date"),
         State('aggregate-choice', 'value'),
-        State('store-map-csv', 'data'),  # new
-        Input('map', 'clickData'),  # new
+        State('store-map-csv', 'data'),
+        Input('map', 'clickData'),
 
         prevent_initial_call=True, interval=10000)
-    def update_with_click_on_map(selected_data, start_date, end_date, aggregate, data, click_data):
-        # def update_with_table_changes(n_clicks, sensor_id, start_date, end_date, aggregate, data, click_data):
+    def update_with_click_on_map(n_click, selected_data, start_date, end_date, aggregate, data, click_data):
 
         fig = fig0
         fig_message = ("Aucun capteur n'est sélectionné. Click sur la carte pour sélectionner un capteur existant."
                        " Tu peux aussi ajouter un nouveau capteur.")
+
+
         image_card = html.H3("")
 
         model, num, zone, pk, place = "", "", "", "", ""
-        lat, long = "48.89", "2.32",
-        date_pose, date_depose = "01/01/1900", ""
+        lat, long = "", "",
+        date_pose, date_depose = "", ""
         delta, divers = "", ""
         net, line = "", ""
         sensor_id = ""
 
         sensors_df = pd.DataFrame(data)
 
-        # si on a plusieurs points, aucun points electionne
+        # aucun point selectionné
         if selected_data is None or (
                 selected_data and 'points' in selected_data.keys() and selected_data['points'] == []):
 
-            # ATTENTION BUG ORDRE
             if click_data and 'points' in click_data.keys() and type(
-                    click_data['points'][0]['customdata']) == str:  # new
+                    click_data['points'][0]['customdata']) == str:
                 route = click_data['points'][0]['customdata']
                 net = route.split(" ")[0]
                 line = route.split(" ")[1]
@@ -147,11 +146,8 @@ def register_callbacks(dash_app):
 
 
         else:
-            # premier 0 car on prend le premier point selectionne
-
-            # ERREUR
+            # premier 0 car on prend seulement le premier point selectionné
             sensor_id = selected_data['points'][0]['customdata'][0]
-
             sensors_df = sensors_df.set_index("Id")
 
             model = sensors_df.loc[sensor_id, "Modele"]
@@ -168,13 +164,9 @@ def register_callbacks(dash_app):
             net = sensors_df.loc[sensor_id, "Reseau"]
             line = sensors_df.loc[sensor_id, "Ligne"]
 
-            if num is None: num = ""
             if date_depose is None: date_depose = ""
             if pk is None: pk = ""
             if delta is None: delta = ""
-            if divers is None: divers = ""
-            if type(pk) == np.float64 and np.isnan(pk) == True: pk = ""
-            if type(delta) == np.float64 and np.isnan(delta) == True: delta = ""
 
             start_date_timestamp = datetime.strptime(start_date, "%Y-%m-%d").timestamp()
             end_date_timestamp = datetime.strptime(end_date, "%Y-%m-%d").timestamp()
@@ -193,8 +185,7 @@ def register_callbacks(dash_app):
                     ORDER BY Date
                 """
 
-            measure_dtype = {'Unix': str, 'mm': np.float64, 'celsius': np.float64}
-
+            # measure_dtype = {'Unix': str, 'mm': np.float64, 'celsius': np.float64}
             df = pd.read_sql(query, con=db.engine)
 
             df = df.set_index('Date')
@@ -204,22 +195,17 @@ def register_callbacks(dash_app):
                 fig_message = "données trop volumineuses pour être affichées, modifier les options"
 
             if size_on_memory <= 200000:
-                store = df.to_dict('records')
                 fig = create_time_series_fig(df, sensor_id, delta)
                 fig_message = ("Un capteur est sélectionné. Ses mesures sont affichées sur le graphe."
                                " Tu peux modifier les informations de ce capteur, ou y ajouter de nouvelles mesures")
 
             try:
-                # images_path = f'data_capteur/images/{sensor_id}/'
-                # images_name_file = os.listdir(images_path)
-                # images_number = [int(x.split(".")[0]) for x in images_name_file]
-                # image_displayed = f'{images_path}{max(images_number)}.png'
-
-                # a voir : il y a plusieur immage
+                # a voir : il y a plusieurs images
                 query = f"""
                             SELECT data
                             FROM sensor_images
                             WHERE sensor_id ='{sensor_id}'
+                            ORDER BY id DESC
                             LIMIT 1
                             """
 
@@ -230,21 +216,12 @@ def register_callbacks(dash_app):
             except TypeError:
                 image_card = html.H3("il n'y a pas encore d'image du capteur dans les données du dashboard"),
             else:
+                # a voir png, cherher le format
                 image_card = html.Img(src=f"data:image/png;base64,{image_encoded}", width='100%'),
-                # image_card = html.Img(src=encode_image(image_displayed), width='100%'),
 
         return (fig, True, fig_message,
-                image_card, str(model), str(num), zone, place, str(pk), str(lat), str(long), str(date_pose),
-                str(date_depose), str(delta), str(divers), str(net), str(line), sensor_id)
-
-    def encode_image(image_path):
-        try:
-            with open(image_path, "rb") as image_file:
-                encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
-        except FileNotFoundError:
-            print("erreur")
-        else:
-            return f"data:image/png;base64,{encoded_string}"
+                image_card, model, num, zone, place, str(pk), str(lat), str(long), str(date_pose),
+                str(date_depose), str(delta), divers, net, line, sensor_id)
 
 
 def register_owner_callbacks(dash_app):
@@ -300,7 +277,7 @@ def register_owner_callbacks(dash_app):
         ingest_card_message = f""
         confirm_message_is_displayed = False
         confirm_message = ""
-        sensor = None
+        sensor_dict = None
 
         if click is None:
             raise PreventUpdate
@@ -343,9 +320,6 @@ def register_owner_callbacks(dash_app):
 
 
         elif sensor_select:
-            # on prendre la valeur du reseau et de la ligne dans le store
-
-            sensor = sensor_select
             confirm_message_is_displayed = True
             confirm_message = f"""
             Les données de ton fichier vont étre intégrées au capteur existant {sensor_select}.  
@@ -354,6 +328,15 @@ def register_owner_callbacks(dash_app):
             click annuler, pour arrêter l'ingestion, puis choisis ou crée le bon capteur.      
     """
 
+            sensor_dict = {'Id': sensor_select, 'Num': num, 'Modele': model,
+                           'Reseau': net[0] if type(net) == list else net,
+                           'Ligne': line[0] if type(line) == list else line,
+                           'Zone': zone, 'Lieu': lieu,
+                           'pk': np.float64('nan') if pk == '' else float(pk),
+                           'Latitude': float(lat), 'Longitude': float(long), 'Date_pose': date_pose,
+                           'Date_depose': date_depose,
+                           'Ouverture_pose': np.float64('nan') if delta == '' else float(delta),
+                           'Divers': divers}
         else:
 
             query = db.select(Sensor.Id).order_by(desc(Sensor.Id))
@@ -362,22 +345,8 @@ def register_owner_callbacks(dash_app):
             sensor_created_number = sensor_last_number + 1
             sensor_created = "F" + str(sensor_created_number)
 
-            sensor = sensor_created
             confirm_message_is_displayed = True
 
-            #         sensors_df = pd.DataFrame(sensors_json)
-            #         tables_stored = []
-            #         if 'Id' in sensors_df.columns:
-            #             sensors_df.set_index('Id', inplace=True)
-            #             sensors_stored = sensors_df.index
-            #
-            #
-            #         if sensor_created in sensors_stored:
-            #             confirm_message = f"""
-            # Les données de ton fichier vont être intégrées au capteur EXISTANT {sensor_created} .
-            # Press OK pour lancer l'ingestion.
-            #             """
-            #         else:
             confirm_message = f"""
     Les données de ton fichier concernent un NOUVEAU capteur.
     Ce capteur s'appelera {sensor_created}.  
@@ -385,17 +354,15 @@ def register_owner_callbacks(dash_app):
     Press OK pour lancer l'ingestion.
     """
 
-        line = line[0] if type(line) == list else line
-        net = net[0] if type(net) == list else net
-        pk = np.float64('nan') if pk == '' else float(pk)
-        delta = np.float64('nan') if delta == '' else float(delta)
-        lat = float(lat)
-        long = float(long)
-
-        sensor_dict = {'Id': sensor, 'Num': num, 'Modele': model, 'Reseau': net, 'Ligne': line, 'Zone': zone,
-                       'Lieu': lieu, 'pk': pk,
-                       'Latitude': lat, 'Longitude': long, 'Date_pose': date_pose, 'Date_depose': date_depose,
-                       'Ouverture_pose': delta, 'Divers': divers}
+            sensor_dict = {'Id': sensor_created, 'Num': num, 'Modele': model,
+                           'Reseau': net[0] if type(net) == list else net,
+                           'Ligne': line[0] if type(line) == list else line,
+                           'Zone': zone, 'Lieu': lieu,
+                           'pk': np.float64('nan') if pk == '' else float(pk),
+                           'Latitude': float(lat), 'Longitude': float(long), 'Date_pose': date_pose,
+                           'Date_depose': date_depose,
+                           'Ouverture_pose': np.float64('nan') if delta == '' else float(delta),
+                           'Divers': divers}
 
         return confirm_message_is_displayed, confirm_message, sensor_dict, ingest_card_message, ""
 
@@ -407,29 +374,37 @@ def register_owner_callbacks(dash_app):
         try:
             content_format, content_string = contents.split(',')
 
-            if content_format != "data:image/png;base64":
-                return 'télécharge une image png'
+            if content_format not in ["data:image/png;base64", "data:image/jpg;base64"]:
+                return 'ECHEC : format != png ou jpg'
             decoded = base64.b64decode(content_string)
             if len(decoded) > 4000000:
-                return 'télécharge une image de taille inférieure à 5Mo'
-            else:
-                return "image prête pour l'ingestion"
+                return 'ECHEC :taille > à 5Mo'
+
         except AttributeError:
-            return "aucune image téléchargée"
+            return "ECHEC : fichier != image"
+        else:
+            return "image OK"
 
     @dash_app.callback(
 
-        # Output('database-message', 'children'),
         Output('store-map-csv', 'data', allow_duplicate=True),
         Output('ingest-message', 'children', allow_duplicate=True),
+        Output('image-message', 'children', allow_duplicate=True),
+        Output('image-card', 'children', allow_duplicate=True),
         Output('dropdown-table', 'value', allow_duplicate=True),
+        Output('graph-time-series', 'figure', allow_duplicate=True),
+        Output('fig-message', 'children', allow_duplicate=True),
         Input('confirm-throw-ingestion', 'submit_n_clicks'),
         State('store-data-uploaded', 'data'),
         State('store-map-csv', 'data'),
         State('store-metadata-to-ingest', 'data'),
         State('upload-image-dcc', 'contents'),
+        State('upload-image-dcc', 'filename'),
+        State('date-picker-select', "start_date"),
+        State('date-picker-select', "end_date"),
+        State('aggregate-choice', 'value'),
         interval=10000, prevent_initial_call='initial_duplicate')
-    def ingest_final_step(click, data, sensors_json, new_sensor_dict, image_contents):
+    def ingest_final_step(click, data, sensors_json, new_sensor_dict, image_contents,image_name, start_date, end_date, aggregate):
 
         if click is None or new_sensor_dict == {}:
             raise PreventUpdate
@@ -437,11 +412,6 @@ def register_owner_callbacks(dash_app):
         else:
             sensor_id = new_sensor_dict["Id"]
             df = pd.DataFrame(data)
-
-            # sauvegarder les mesures dans une table de la database
-            # save_in_database(df,db, sensor_id)
-
-            from sqlalchemy import text
 
             def create_table(sensor_id):
                 class Measure(db.Model):
@@ -465,32 +435,49 @@ def register_owner_callbacks(dash_app):
             table_length_after = db.session.execute(text(f"SELECT COUNT(*) FROM {sensor_id};")).scalar()
             table_length = table_length_after - table_length_before
             database_info = (
-                [f" ### Information sur l'ingestion : le capteur {sensor_id} a {table_length} nouvelles mesures."])
+                [f" # Information sur l'ingestion : le capteur {sensor_id} a {table_length} nouvelles mesures."])
 
-            sensors_dtype = {'Id': str, 'Num': str, 'Modele': str, 'Reseau': str, 'Ligne': str, 'Zone': str,
-                             'Lieu': str,
-                             'pk': np.float64, 'Latitude': np.float64, 'Longitude': np.float64, 'Date_pose': str,
-                             'Date_depose': str, 'Ouverture_pose': np.float64, 'Divers': str}
-
-            sensors_df = pd.DataFrame(data=sensors_json, columns=sensors_dtype.keys())
-            sensors_df = sensors_df.astype(sensors_dtype)
+            sensors_df = pd.DataFrame(data=sensors_json)
 
 
-            # cas 1 : ajout de mesures  à un capteur existant
             if 'Id' in sensors_df.columns and sensor_id in sensors_df['Id'].values:
                 sensors_json = save_old_sensors_info(db, sensors_df, new_sensor_dict)
-            # cas 2 : ajout de mesures  à un nouveau capteur
             else:
                 sensors_json = save_new_sensors_info(db, sensors_json, new_sensor_dict)
 
-            image_upload_info = save_image_in_database(image_uploaded=image_contents, db=db, sensor_id=sensor_id)
+            image_upload_info = save_image_in_database(image_uploaded=image_contents, image_name = image_name, db=db, sensor_id=sensor_id)
 
-            return sensors_json, database_info + image_upload_info, sensor_id
+            try:
+                # a voir : il y a plusieurs images
+                query = f"""
+                            SELECT data
+                            FROM sensor_images
+                            WHERE sensor_id ='{sensor_id}'
+                            ORDER BY id DESC
+                            LIMIT 1
+                            """
+
+                image_from_database = db.session.execute(text(query)).scalar()
+                image_encoded = base64.b64encode(image_from_database).decode('utf-8')
+
+            except TypeError:
+                image_card = html.H3("il n'y a pas encore d'image du capteur dans les données du dashboard"),
+            else:
+                # a voir png, cherher le format
+                image_card = html.Img(src=f"data:image/png;base64,{image_encoded}", width='100%'),
+
+
+            fig, fig_message = query_time_series_data_and_create_fig(db, sensor_id, start_date, end_date, aggregate,
+                                                                     new_sensor_dict["Ouverture_pose"])
+
+            return sensors_json, database_info, image_upload_info, image_card, sensor_id, fig, fig_message
 
     @dash_app.callback(
 
         Output('store-map-csv', 'data', allow_duplicate=True),
         Output('ingest-message', 'children', allow_duplicate=True),
+        Output('image-message', 'children', allow_duplicate=True),
+        Output('image-card', 'children', allow_duplicate=True),
         Input('button-update-metadata', 'n_clicks'),
         State('store-map-csv', 'data'),
         State('dropdown-table', 'value'),
@@ -508,13 +495,12 @@ def register_owner_callbacks(dash_app):
         State('dropdown-net', 'value'),  # new
         State('dropdown-line', 'value'),  # new
         State('upload-image-dcc', 'contents'),
+        State('upload-image-dcc', 'filename'),
         Prevent_initial_call=True, interval=10000, prevent_initial_call='initial_duplicate'
 
     )
-    def update_sensors_info(click, sensors_json_stored, sensor_id, lat, long, pk, delta, num, date_pose, date_depose,
-                            lieu, zone, divers, model,
-                            net, line,
-                            image_contents):
+    def update_sensors_info(click, sensors_json, sensor_id, lat, long, pk, delta, num, date_pose, date_depose,
+                            lieu, zone, divers, model, net, line, image_contents,image_name):
         if click is None or sensor_id is None:
             raise PreventUpdate
 
@@ -534,52 +520,48 @@ def register_owner_callbacks(dash_app):
                     raise ValueError("fichier image invalide")
 
         except (TypeError, ValueError) as e:
-            return sensors_json_stored, f"echec de la mise à jour des données : {e}"
+            return sensors_json, f"echec de la mise à jour des données : {e}"
 
         except ValueError("fichier image invalide") as e:
-            return sensors_json_stored, f"echec de la mise à jour des données : {e}"
+            return sensors_json, f"echec de la mise à jour des données : {e}"
 
         else:
+            sensor_updated = {'Id': sensor_id,
+                              'Reseau': net[0] if type(net) == list else net,
+                              'Ligne': line[0] if type(line) == list else line,
+                              'Zone': zone, 'Lieu': lieu, 'pk': float(pk),
+                              'Modele': model, 'Num': num, 'Latitude': float(lat), 'Longitude': float(long),
+                              'Date_pose': date_pose,
+                              'Date_depose': date_depose, 'Ouverture_pose': float(delta), 'Divers': divers}
 
-            line = line[0] if type(line) == list else line
-            net = net[0] if type(net) == list else net
-            pk = float(pk)
-            delta = float(delta)
-            lat = float(lat)
-            long = float(long)
+            sensors_df = pd.DataFrame(sensors_json)
+            sensors_json = save_old_sensors_info(db, sensors_df, sensor_updated)
 
-            sensor_updated = {'Reseau': net, 'Ligne': line, 'Zone': zone, 'Lieu': lieu, 'pk': pk, 'Modele': model,
-                              'Num': num,
-                              'Latitude': lat, 'Longitude': long, 'Date_pose': date_pose, 'Date_depose': date_depose,
-                              'Ouverture_pose': delta, 'Divers': divers}
+            message_image = save_image_in_database(image_uploaded=image_contents,image_name=image_name, db=db, sensor_id=sensor_id)
 
-            sensors_df = pd.DataFrame(sensors_json_stored)
+            try:
+                # a voir : il y a plusieurs images
+                query = f"""
+                            SELECT data
+                            FROM sensor_images
+                            WHERE sensor_id ='{sensor_id}'
+                            ORDER BY id DESC
+                            LIMIT 1
+                            """
 
-            #A VERIFIER
-            # sensors_df = sensors_df.set_index("Id")
-            # sensors_df.loc[sensor_id, :] = pd.Series(sensor_updated)
-            # sensors_df.reset_index(inplace=True)
-            # sensors_json_stored = sensors_df.to_dict('records')
-            #
-            # # new remplacer la valeur dans la database
-            #sensor_updated['Id'] = sensor_id
-            # sensor_updated['Date_pose'] = datetime.strptime(date_pose, '%d/%m/%Y')
-            # sensor_updated['Date_depose'] = None if date_depose == "" else datetime.strptime(date_depose, '%d/%m/%Y')
-            # db.session.execute(update(Sensor), [sensor_updated])
-            # db.session.commit()
+                image_from_database = db.session.execute(text(query)).scalar()
+                image_encoded = base64.b64encode(image_from_database).decode('utf-8')
 
-            sensor_updated = {'Id': sensor_id, 'Reseau': net, 'Ligne': line, 'Zone': zone, 'Lieu': lieu, 'pk': pk, 'Modele': model,
-                              'Num': num,
-                              'Latitude': lat, 'Longitude': long, 'Date_pose': date_pose, 'Date_depose': date_depose,
-                              'Ouverture_pose': delta, 'Divers': divers}
 
-            sensors_json_stored = save_old_sensors_info(db, sensors_df, sensor_updated)
+            except TypeError:
+                image_card = html.H3("il n'y a pas encore d'image du capteur dans les données du dashboard"),
+            else:
+                # a voir png, cherher le format
+                image_card = html.Img(src=f"data:image/png;base64,{image_encoded}", width='100%'),
 
-            message_image = save_image_in_database(image_uploaded=image_contents, db=db, sensor_id=sensor_id)
+            message = ["information du capteur mis a jour"]
 
-            message = ["information du capteur mis a jour"] + message_image
-
-            return sensors_json_stored, message
+            return sensors_json, message, message_image,image_card
 
     @dash_app.callback(
         Output('confirm-delete-table', 'displayed'),
@@ -599,6 +581,9 @@ def register_owner_callbacks(dash_app):
         Output('store-map-csv', 'data', allow_duplicate=True),
         Output('ingest-message', 'children', allow_duplicate=True),
         Output('dropdown-table', 'value', allow_duplicate=True),
+        Output('graph-time-series', 'figure', allow_duplicate=True),
+        Output('fig-message', 'children', allow_duplicate=True),
+        Output('image-card', 'children', allow_duplicate=True),
         Input('confirm-delete-table', 'submit_n_clicks'),
         State('dropdown-table', 'value'),
         State('store-map-csv', 'data'),
@@ -612,6 +597,7 @@ def register_owner_callbacks(dash_app):
 
             db.session.execute(text(f" DELETE FROM sensors_tb WHERE Id ='{sensor_select}'"))
             db.session.execute(text(f"DROP TABLE IF EXISTS {sensor_select}"))
+            db.session.execute(text(f" DELETE FROM sensor_images WHERE sensor_id ='{sensor_select}'"))
 
             sensors_df = pd.DataFrame(sensors_json)
             sensors_df.set_index("Id", inplace=True)
@@ -619,12 +605,8 @@ def register_owner_callbacks(dash_app):
             sensors_df.reset_index(inplace=True)
             db.session.commit()
 
-            dossier_images_path = f"data_capteur/images/{sensor_select}"
-            # for file in os.listdir(dossier_images_path):
-            #     images_path = os.path.join(dossier_images_path, file)
-            #     if os.path.isfile(images_path):
-            #         # Supprimer le fichier
-            #         os.remove(images_path)
-            #
-            # os.rmdir(dossier_images_path)
-            return sensors_df.to_dict('records'), f'capteur {sensor_select} supprimé', None
+            fig = fig0
+            fig_message = ("Aucun capteur n'est sélectionné. Click sur la carte pour sélectionner un capteur existant."
+                           " Tu peux aussi ajouter un nouveau capteur.")
+
+            return sensors_df.to_dict('records'), f'capteur {sensor_select} supprimé', None, fig, fig_message, ""

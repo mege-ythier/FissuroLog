@@ -1,9 +1,11 @@
+from datetime import datetime
+import numpy as np
 import plotly.graph_objects as go
 import pandas as pd
 import json
 
 
-# importation des metadata
+
 def create_time_series_fig(df, table_name, delta_mm):
     title = f"capteur: {table_name}"
 
@@ -24,7 +26,9 @@ def create_time_series_fig(df, table_name, delta_mm):
                                  opacity=0.7),
                              )
                   )
-    if delta_mm == "": delta_mm = 0
+
+    delta_mm = 0 if delta_mm == "" else np.float64(delta_mm)
+
     fig.add_trace(go.Scatter(y=df["mm"] - float(delta_mm),
                              x=df.index,
                              name="ouverture relative",
@@ -267,26 +271,8 @@ def create_time_series_fig(df, table_name, delta_mm):
     return fig
 
 
-def update_time_series_fig(start_date, end_date, table_name):
-    import sqlite3
-    start_date_timestamp = start_date.timestamp()
-    end_date_timestamp = end_date.timestamp()
 
-    # charger les données
-    conn = sqlite3.connect('../../data_capteur/database.db')
-    query = f"SELECT * from {table_name} WHERE unix > {start_date_timestamp} and unix < {end_date_timestamp}"
-    df_from_sensor_table = pd.read_sql_query(query, conn)
-    conn.close()
-
-    # convertir le timstamps en seconde axe x
-    df_from_sensor_table.unix = pd.to_datetime(df_from_sensor_table.unix, unit='s')
-    df_from_sensor_table = df_from_sensor_table.set_index('unix')
-    df_from_sensor_table.index.name = "Date"
-
-    return create_time_series_fig(df_from_sensor_table, table_name)
-
-
-def create_map(sensors_data: list[dict], sensor_index):
+def create_map(sensors_json: list[dict], sensor_index):
     with open("./data_ratp/traces-du-reseau-de-transport-ferre-ratp.geojson", "r") as lines:
         ratp_dict = json.load(lines)
     with open("./data_ratp/couleur-ratp-carte.json", 'r') as files:
@@ -309,10 +295,10 @@ def create_map(sensors_data: list[dict], sensor_index):
         clickmode='event+select')
 
     # dessiner les lignes
-    if sensors_data == []:
+    if sensors_json == []:
         fig.add_trace(go.Scattermapbox())
     else:
-        sensors_df = pd.DataFrame(sensors_data)
+        sensors_df = pd.DataFrame(sensors_json)
         sensors_df["Route"] = sensors_df["Reseau"] + " " + sensors_df["Ligne"].astype(str)
         routes_displayed = (sensors_df["Route"]).unique()
         routes_drawn = []
@@ -359,10 +345,10 @@ def create_map(sensors_data: list[dict], sensor_index):
                     customdata=[sensor],
                     hovertemplate='<b>%{customdata[0]} </b><br><br>'
                                   'Date de la pose: %{customdata[10]}<br>'
-                                  'Modèle: %{customdata[6]}<br>'
-                                  'localisation :%{customdata[3]}<br>'
-                                  'pk:%{customdata[5]}<br>'
-                                  'Ouverture initiale: %{customdata[12]} mm<br>',
+                                  'Modèle: %{customdata[2]}<br>'
+                                  'localisation :%{customdata[5]}<br>'
+                                  'pk:%{customdata[6]}<br>'
+                                  'Ouverture initiale: %{customdata[11]} mm<br>',
                     marker=dict(
                         size=10,
                         color='black',
@@ -390,3 +376,48 @@ def create_map(sensors_data: list[dict], sensor_index):
             )
 
     return fig
+
+
+def query_time_series_data_and_create_fig(db, sensor_id, start_date, end_date, aggregate, delta):
+    start_date_timestamp = datetime.strptime(start_date, "%Y-%m-%d").timestamp()
+    end_date_timestamp = datetime.strptime(end_date, "%Y-%m-%d").timestamp()
+
+    query = f"""
+    SELECT strftime('%Y-%m-%d %H:%M:%S', datetime(unix,'unixepoch')) AS Date,mm,celsius
+    FROM {sensor_id}
+    WHERE  unix > {start_date_timestamp} and unix < {end_date_timestamp}
+    """
+    if aggregate == "oui":
+        query = f"""
+            SELECT  strftime('%Y-%m-%d %H:00:00', datetime(unix,'unixepoch')) AS Date ,mm,celsius
+            FROM {sensor_id}
+            WHERE unix > {start_date_timestamp} and unix < {end_date_timestamp}
+            GROUP BY Date
+            ORDER BY Date
+        """
+
+    # measure_dtype = {'Unix': str, 'mm': np.float64, 'celsius': np.float64}
+    df = pd.read_sql(query, con=db.engine)
+
+    df = df.set_index('Date')
+    df.index.name = "Date"
+    size_on_memory = df.memory_usage(index=True, deep=False).sum()
+
+    fig_message = "données trop volumineuses pour être affichées, modifier les options"
+    fig = go.Figure()
+    fig.update_layout(
+        # autosize=True,
+        height=10,
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        showlegend=False,  # Masquer la légende
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, title=None),
+        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, title=None),
+    )
+
+    if size_on_memory <= 200000:
+        fig = create_time_series_fig(df, sensor_id, delta)
+        fig_message = ("Un capteur est sélectionné. Ses mesures sont affichées sur le graphe."
+                       " Tu peux modifier les informations de ce capteur, ou y ajouter de nouvelles mesures")
+
+    return fig, fig_message

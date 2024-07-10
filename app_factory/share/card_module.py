@@ -136,6 +136,7 @@ def generate_form_card():
                                 html.H5("localisation dans le réseau"),
                                 dcc.Textarea(
                                     id='textarea-lieu',
+                                    value='',
                                     title='Ici tu expliques comment accéder au capteur dans le reseau',
                                     rows=5),
 
@@ -169,7 +170,7 @@ def generate_form_card():
                             html.H5("localisation dans l'ouvrage *"),
                             dcc.Textarea(
                                 id='textarea-zone',
-                                value='',
+                                value='voute',
                                 maxLength=20,
                                 title='exemple : voute, piedroit .....',
                                 rows=1
@@ -191,6 +192,7 @@ def generate_form_card():
                             html.H5("commentaires"),
                             dcc.Textarea(
                                 id='textarea-divers',
+                                value='',
                                 rows=2,
                             ),
 
@@ -206,7 +208,7 @@ def generate_button_card():
         id="button-card",
         children=[
             html.Button(id='button_update_fig', hidden=True, title='charger les mesures'),
-            html.Button(id='button-ingest', hidden=False, title='intégrer les mesures dans la database'),
+            html.Button(id='button-ingest', hidden=True, title='intégrer les mesures dans la database'),
             html.Button(title='Supprimer le capteur',
                         id='button-delete-table', hidden=True, ),
             html.Button(title='modifier les informations du capteur', id='button-update-metadata', hidden=True),
@@ -229,6 +231,7 @@ def generate_message_card():
         children=[
             html.H3(id='fig-message'),
             html.H3(id='ingest-message'),
-            html.H3(id='database-message'),
+            #html.H3(id='database-message'),
+            html.H3(id='image-message'),
 
         ])
