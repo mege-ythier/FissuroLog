@@ -121,7 +121,6 @@ def register_callbacks(dash_app):
         fig_message = ("Aucun capteur n'est sélectionné. Click sur la carte pour sélectionner un capteur existant."
                        " Tu peux aussi ajouter un nouveau capteur.")
 
-
         image_card = html.H3("")
 
         model, num, zone, pk, place = "", "", "", "", ""
@@ -339,6 +338,8 @@ def register_owner_callbacks(dash_app):
                            'Divers': divers}
         else:
 
+            # ne marche pas à partir de 10 capteurs
+
             query = db.select(Sensor.Id).order_by(desc(Sensor.Id))
             sensor_last = db.session.execute(query).scalar()
             sensor_last_number = int(sensor_last.split("F")[1]) if sensor_last else 0
@@ -394,6 +395,7 @@ def register_owner_callbacks(dash_app):
         Output('dropdown-table', 'value', allow_duplicate=True),
         Output('graph-time-series', 'figure', allow_duplicate=True),
         Output('fig-message', 'children', allow_duplicate=True),
+        Output('map', 'selectedData'),
         Input('confirm-throw-ingestion', 'submit_n_clicks'),
         State('store-data-uploaded', 'data'),
         State('store-map-csv', 'data'),
@@ -404,7 +406,8 @@ def register_owner_callbacks(dash_app):
         State('date-picker-select', "end_date"),
         State('aggregate-choice', 'value'),
         interval=10000, prevent_initial_call='initial_duplicate')
-    def ingest_final_step(click, data, sensors_json, new_sensor_dict, image_contents,image_name, start_date, end_date, aggregate):
+    def ingest_final_step(click, data, sensors_json, new_sensor_dict, image_contents, image_name, start_date, end_date,
+                          aggregate):
 
         if click is None or new_sensor_dict == {}:
             raise PreventUpdate
@@ -439,13 +442,13 @@ def register_owner_callbacks(dash_app):
 
             sensors_df = pd.DataFrame(data=sensors_json)
 
-
             if 'Id' in sensors_df.columns and sensor_id in sensors_df['Id'].values:
                 sensors_json = save_old_sensors_info(db, sensors_df, new_sensor_dict)
             else:
                 sensors_json = save_new_sensors_info(db, sensors_json, new_sensor_dict)
 
-            image_upload_info = save_image_in_database(image_uploaded=image_contents, image_name = image_name, db=db, sensor_id=sensor_id)
+            image_upload_info = save_image_in_database(image_uploaded=image_contents, image_name=image_name, db=db,
+                                                       sensor_id=sensor_id)
 
             try:
                 # a voir : il y a plusieurs images
@@ -470,7 +473,8 @@ def register_owner_callbacks(dash_app):
             fig, fig_message = query_time_series_data_and_create_fig(db, sensor_id, start_date, end_date, aggregate,
                                                                      new_sensor_dict["Ouverture_pose"])
 
-            return sensors_json, database_info, image_upload_info, image_card, sensor_id, fig, fig_message
+            selected_data = {'points': [{'customdata': [sensor_id]}]}
+            return sensors_json, database_info, image_upload_info, image_card, sensor_id, fig, fig_message, selected_data
 
     @dash_app.callback(
 
@@ -500,7 +504,7 @@ def register_owner_callbacks(dash_app):
 
     )
     def update_sensors_info(click, sensors_json, sensor_id, lat, long, pk, delta, num, date_pose, date_depose,
-                            lieu, zone, divers, model, net, line, image_contents,image_name):
+                            lieu, zone, divers, model, net, line, image_contents, image_name):
         if click is None or sensor_id is None:
             raise PreventUpdate
 
@@ -537,7 +541,8 @@ def register_owner_callbacks(dash_app):
             sensors_df = pd.DataFrame(sensors_json)
             sensors_json = save_old_sensors_info(db, sensors_df, sensor_updated)
 
-            message_image = save_image_in_database(image_uploaded=image_contents,image_name=image_name, db=db, sensor_id=sensor_id)
+            message_image = save_image_in_database(image_uploaded=image_contents, image_name=image_name, db=db,
+                                                   sensor_id=sensor_id)
 
             try:
                 # a voir : il y a plusieurs images
@@ -561,7 +566,7 @@ def register_owner_callbacks(dash_app):
 
             message = ["information du capteur mis a jour"]
 
-            return sensors_json, message, message_image,image_card
+            return sensors_json, message, message_image, image_card
 
     @dash_app.callback(
         Output('confirm-delete-table', 'displayed'),

@@ -2,8 +2,8 @@
 import logging
 import logging.config
 from functools import wraps
-from logging.handlers import RotatingFileHandler
-from logging.handlers import TimedRotatingFileHandler
+# from logging.handlers import RotatingFileHandler
+# from logging.handlers import TimedRotatingFileHandler
 
 from dash import Dash
 from flask import Flask, render_template, redirect, url_for, request, abort
@@ -11,6 +11,8 @@ from flask.helpers import get_root_path
 from flask_login import LoginManager, login_required, current_user
 from flask_sqlalchemy import SQLAlchemy
 from flask import Blueprint
+
+
 
 bp = Blueprint('main_blueprint', __name__, static_folder='static', template_folder='template')
 from . import routes
@@ -23,7 +25,7 @@ def dash_login_required(func):
     @wraps(func)
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated:
-            return redirect(url_for('auth.login'))  # Assurez-vous que cette route existe
+            return redirect(url_for('auth.login'))
         return func(*args, **kwargs)
 
     return decorated_function

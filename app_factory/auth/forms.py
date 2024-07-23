@@ -4,13 +4,10 @@ from flask_wtf import FlaskForm
 from wtforms import PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, Optional, ValidationError, AnyOf
 
-sign_up_authorized_mail = ["amandine.mege-ythier@ratp.fr", "test@ratp.com", "amandine_mege@msn.com"]
 
-
-class SignupForm(FlaskForm):
+class SignupFormForAdmin(FlaskForm):
     """User Sign-up Form."""
 
-    # name = StringField("Name", validators=[DataRequired()])
     email = StringField(
         "Email",
         validators=[
@@ -46,7 +43,7 @@ class SignupForm(FlaskForm):
     submit = SubmitField("Register")
 
 
-class SignupGuestForm(FlaskForm):
+class SignupForm(FlaskForm):
     """User Sign-up Form."""
 
     # name = StringField("Name", validators=[DataRequired()])

@@ -10,7 +10,7 @@ from sqlalchemy import update
 
 from app_factory import login_manager,db
 from app_factory.models import User
-from .forms import LoginForm, SignupForm, ChangePasswordForm, SignupGuestForm
+from .forms import LoginForm, SignupFormForAdmin, ChangePasswordForm, SignupForm
 from . import bp
 
 
@@ -41,7 +41,7 @@ def signup():
     GET requests serve sign-up page.
     POST requests validate form & user creation.
     """
-    form = SignupGuestForm()
+    form = SignupForm()
 
     if form.validate_on_submit():
         existing_user = User.query.filter_by(email=form.email.data).first()
@@ -83,7 +83,7 @@ def signup_owner():
     GET requests serve sign-up page.
     POST requests validate form & user creation.
     """
-    form = SignupForm()
+    form = SignupFormForAdmin()
 
     if form.validate_on_submit():
         existing_user = User.query.filter_by(email=form.email.data).first()
@@ -118,6 +118,11 @@ def login():
     GET requests serve Log-in page.
     POST requests validate and redirect user to dashboard.
     """
+    if not User.query.filter_by(email='admin@ratp.fr').first():
+        admin_user = User(email='admin@ratp.fr', role='owner')
+        admin_user.set_password('ok')
+        db.session.add(admin_user)
+        db.session.commit()
 
     # Bypass if user is logged in
     if current_user.is_authenticated:
