@@ -12,7 +12,7 @@ class User(UserMixin, db.Model):
 
     __tablename__ = "flasklogin_users"
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.String(5), primary_key=True)
     email = db.Column(db.String(40), unique=True, nullable=False)
     role = db.Column(db.String(10), nullable=False)
     password = db.Column(db.String(200), primary_key=False, unique=False, nullable=False)

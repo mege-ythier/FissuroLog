@@ -5,7 +5,6 @@ import pandas as pd
 import json
 
 
-
 def create_time_series_fig(df, table_name, delta_mm):
     title = f"capteur: {table_name}"
 
@@ -136,9 +135,9 @@ def create_time_series_fig(df, table_name, delta_mm):
     fig.update_layout(
         height=390,
         margin={'l': 10, 'b': 10, 'r': 10, 't': 60},
-        #plot_bgcolor='rgb(245, 250, 245)',
+        # plot_bgcolor='rgb(245, 250, 245)',
         plot_bgcolor='rgba(0,0,0,0)',
-        #paper_bgcolor='rgba(0,0,0,0)',
+        # paper_bgcolor='rgba(0,0,0,0)',
         paper_bgcolor='rgb(245, 250, 245)',
         font={"color": "rgb(10, 0, 130)"},
         dragmode="zoom",
@@ -271,7 +270,6 @@ def create_time_series_fig(df, table_name, delta_mm):
     return fig
 
 
-
 def create_map(sensors_json: list[dict], sensor_index):
     with open("./data_ratp/traces-du-reseau-de-transport-ferre-ratp.geojson", "r") as lines:
         ratp_dict = json.load(lines)
@@ -379,24 +377,42 @@ def create_map(sensors_json: list[dict], sensor_index):
 
 
 def query_time_series_data_and_create_fig(db, sensor_id, start_date, end_date, aggregate, delta):
+
     start_date_timestamp = datetime.strptime(start_date, "%Y-%m-%d").timestamp()
     end_date_timestamp = datetime.strptime(end_date, "%Y-%m-%d").timestamp()
+    query = ""
 
-    query = f"""
-    SELECT strftime('%Y-%m-%d %H:%M:%S', datetime(unix,'unixepoch')) AS Date,mm,celsius
-    FROM {sensor_id}
-    WHERE  unix > {start_date_timestamp} and unix < {end_date_timestamp}
-    """
-    if aggregate == "oui":
+    if db.engine.name == 'sqlite':
+
         query = f"""
-            SELECT  strftime('%Y-%m-%d %H:00:00', datetime(unix,'unixepoch')) AS Date ,mm,celsius
-            FROM {sensor_id}
-            WHERE unix > {start_date_timestamp} and unix < {end_date_timestamp}
-            GROUP BY Date
-            ORDER BY Date
+        SELECT strftime('%Y-%m-%d %H:%M:%S', datetime(unix,'unixepoch')) AS Date,mm,celsius
+        FROM F{sensor_id}
+        WHERE  unix > {start_date_timestamp} and unix < {end_date_timestamp}
         """
+        if aggregate == "oui":
+            query = f"""
+                SELECT  strftime('%Y-%m-%d %H:00:00', datetime(unix,'unixepoch')) AS Date ,mm,celsius
+                FROM F{sensor_id}
+                WHERE unix > {start_date_timestamp} and unix < {end_date_timestamp}
+                GROUP BY Date
+                ORDER BY Date
+            """
+    if db.engine.name == 'mysql':
 
-    # measure_dtype = {'Unix': str, 'mm': np.float64, 'celsius': np.float64}
+        query = f"""
+        SELECT DATE_FORMAT(FROM_UNIXTIME(unix), '%Y-%m-%d %H:%M:%S') AS Date, mm, celsius
+        FROM F{sensor_id}
+        WHERE  unix > {start_date_timestamp} and unix < {end_date_timestamp}
+        """
+        if aggregate == "oui":
+            query = f"""
+                SELECT DATE_FORMAT(FROM_UNIXTIME(unix), '%Y-%m-%d %H:00:00') AS Date, mm, celsius
+                FROM F{sensor_id}
+                WHERE unix > {start_date_timestamp} and unix < {end_date_timestamp}
+                GROUP BY Date
+                ORDER BY Date
+            """
+
     df = pd.read_sql(query, con=db.engine)
 
     df = df.set_index('Date')
@@ -421,3 +437,4 @@ def query_time_series_data_and_create_fig(db, sensor_id, start_date, end_date, a
                        " Tu peux modifier les informations de ce capteur, ou y ajouter de nouvelles mesures")
 
     return fig, fig_message
+

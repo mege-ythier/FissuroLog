@@ -3,11 +3,11 @@ import pandas as pd
 import base64
 
 from app_factory import db
-from app_factory.owner.ingest_module import parse_file_and_update_ingest_card
-from app_factory.share.fig_module import create_map
+from app_factory.utils.ingest import parse_file_and_update_ingest_card
+from app_factory.utils.fig import create_map
 
 
-from app_factory.owner.callbacks import register_owner_callbacks
+from app_factory.callbacks import register_owner_callbacks
 # from app_factory.old_app import parse_file_and_update_ingest_card
 # from app_factory.old_app import ingest_middle_step
 # from app_factory.old_app import delete_table_final_step

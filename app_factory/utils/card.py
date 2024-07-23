@@ -170,7 +170,7 @@ def generate_form_card():
                             html.H5("localisation dans l'ouvrage *"),
                             dcc.Textarea(
                                 id='textarea-zone',
-                                value='voute',
+                                value='',
                                 maxLength=20,
                                 title='exemple : voute, piedroit .....',
                                 rows=1
@@ -235,3 +235,114 @@ def generate_message_card():
             html.H3(id='image-message'),
 
         ])
+
+def generate_form_card_test():
+    return html.Div(id='form-card',
+                    hidden=False,
+                    children=[
+                        html.Div(
+                            id='form-card-column-left', children=[
+                                html.H5("Réseau"),
+                                dcc.Dropdown(
+                                    options=pd.Series(["RER", "METRO", "TRAM"]),
+                                    id='dropdown-net',
+                                    value=[],
+                                    multi=True,
+                                    style={'minWidth': '100px'}
+                                ),
+
+                                html.H5("type de capteur"),
+                                dcc.Textarea(
+                                    id='textarea-model',
+                                    disabled=True,
+                                    value='',
+                                    rows=1
+                                ),
+                                html.H5("Date de la pose *"),
+                                dcc.Textarea(
+                                    id='textarea-date-pose',
+                                    value='01/01/2000',
+                                    rows=1
+                                ),
+                                html.H5("Ouverture à la pose"),
+                                dcc.Textarea(
+                                    id='textarea-delta',
+                                    value='',
+                                    rows=1
+                                ),
+
+                                html.H5("Latitude *"),
+                                dcc.Textarea(
+                                    id='textarea-lat',
+                                    value='48.86182447752475',
+                                    rows=1
+                                ),
+                                html.H5("localisation dans le réseau"),
+                                dcc.Textarea(
+                                    id='textarea-lieu',
+                                    value='',
+                                    title='Ici tu expliques comment accéder au capteur dans le reseau',
+                                    rows=5),
+
+                                dcc.Upload(
+                                    id='upload-image-dcc',
+                                    children="télécharger une image",
+                                    multiple=False
+                                )
+                            ]),
+                        html.Div([
+                            html.H5("ligne"),
+                            dcc.Dropdown(
+                                options=all_lines,
+                                value=[],
+                                id='dropdown-line',
+                                multi=True,
+                                style={'minWidth': '100px'}
+                            ),
+                            html.H5("numero du capteur"),
+                            dcc.Textarea(
+                                id='textarea-num',
+                                value='',
+                                rows=1
+                            ),
+                            html.H5("Date de la dépose"),
+                            dcc.Textarea(
+                                id='textarea-date-depose',
+                                value='',
+                                rows=1
+                            ),
+                            html.H5("localisation dans l'ouvrage *"),
+                            dcc.Textarea(
+                                id='textarea-zone',
+                                value='voute',
+                                maxLength=20,
+                                title='exemple : voute, piedroit .....',
+                                rows=1
+                            ),
+                            html.H5("Longitude *"),
+                            dcc.Textarea(
+                                id='textarea-long',
+                                value='2.347008154377339',
+                                rows=1
+                            ),
+
+                            html.H5("pk"),
+                            dcc.Textarea(
+                                id='textarea-pk',
+                                value='',
+                                rows=1,
+                            ),
+
+                            html.H5("commentaires"),
+                            dcc.Textarea(
+                                id='textarea-divers',
+                                value='',
+                                rows=2,
+                            ),
+
+                            html.Br(),
+                            html.P("", id="text-error-upload-image"),
+                        ]),
+                        dcc.Store(id="store-metadata-to-ingest", data={}),
+                    ])
+

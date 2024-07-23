@@ -7,15 +7,15 @@ from dash import html, Input, Output, State
 from dash.exceptions import PreventUpdate
 import pandas as pd
 
-from flask_login import current_user, login_required
-from sqlalchemy import update, text, desc
+from flask_login import current_user
+from sqlalchemy import text, desc
 
-from app_factory.share.card_module import fig0
-from app_factory.owner.ingest_module import parse_file_and_update_ingest_card, save_image_in_database, \
+from app_factory.utils.card import fig0
+from app_factory.utils.ingest import parse_file_and_update_ingest_card, save_image_in_database, \
     save_new_sensors_info, save_old_sensors_info
-from app_factory.share.fig_module import create_time_series_fig, create_map, query_time_series_data_and_create_fig
+from app_factory.utils.fig import create_map, query_time_series_data_and_create_fig
 
-from app_factory.models import Sensor, SensorImage
+from app_factory.models import Sensor
 from app_factory import db
 
 
@@ -167,36 +167,7 @@ def register_callbacks(dash_app):
             if pk is None: pk = ""
             if delta is None: delta = ""
 
-            start_date_timestamp = datetime.strptime(start_date, "%Y-%m-%d").timestamp()
-            end_date_timestamp = datetime.strptime(end_date, "%Y-%m-%d").timestamp()
-
-            query = f"""
-            SELECT strftime('%Y-%m-%d %H:%M:%S', datetime(unix,'unixepoch')) AS Date,mm,celsius
-            FROM {sensor_id}
-            WHERE  unix > {start_date_timestamp} and unix < {end_date_timestamp}
-            """
-            if aggregate == "oui":
-                query = f"""
-                    SELECT  strftime('%Y-%m-%d %H:00:00', datetime(unix,'unixepoch')) AS Date ,mm,celsius
-                    FROM {sensor_id}
-                    WHERE unix > {start_date_timestamp} and unix < {end_date_timestamp}
-                    GROUP BY Date
-                    ORDER BY Date
-                """
-
-            # measure_dtype = {'Unix': str, 'mm': np.float64, 'celsius': np.float64}
-            df = pd.read_sql(query, con=db.engine)
-
-            df = df.set_index('Date')
-            df.index.name = "Date"
-            size_on_memory = df.memory_usage(index=True, deep=False).sum()
-            if size_on_memory > 200000:
-                fig_message = "données trop volumineuses pour être affichées, modifier les options"
-
-            if size_on_memory <= 200000:
-                fig = create_time_series_fig(df, sensor_id, delta)
-                fig_message = ("Un capteur est sélectionné. Ses mesures sont affichées sur le graphe."
-                               " Tu peux modifier les informations de ce capteur, ou y ajouter de nouvelles mesures")
+            fig, fig_message = query_time_series_data_and_create_fig(db, sensor_id, start_date, end_date, aggregate, delta)
 
             try:
                 # a voir : il y a plusieurs images
@@ -268,20 +239,19 @@ def register_owner_callbacks(dash_app):
         State('textarea-date-depose', 'value'),
         State('textarea-delta', 'value'),
         State('textarea-divers', 'value'),
-        State('store-map-csv', 'data'),
 
         prevent_initial_call=True, interval=10000)
-    def ingest_middle_step(click, sensor_select, model, num, net, line, zone, lieu, pk, long, lat, date_pose,
-                           date_depose, delta, divers, sensors_json):
+    def ingest_middle_step(click, selected_sensor, model, num, net, line, zone, lieu, pk, long, lat, date_pose,
+                           date_depose, delta, divers):
+        ingest_sensor = ""
         ingest_card_message = f""
         confirm_message_is_displayed = False
         confirm_message = ""
-        sensor_dict = None
 
         if click is None:
             raise PreventUpdate
 
-        elif any(len(value) == 0 for value in [net, line]) and not sensor_select:
+        elif any(len(value) == 0 for value in [net, line]) and not selected_sensor:
             ingest_card_message = "ECHEC : La ligne ou le réseau ne sont pas renseignés dans les menus déroulants"
 
         elif any(value == "" for value in [zone, model, lat, long]):
@@ -318,52 +288,40 @@ def register_owner_callbacks(dash_app):
             ingest_card_message = "ECHEC : Sélectionne une seule ligne!"
 
 
-        elif sensor_select:
+        elif selected_sensor:
+            ingest_sensor = selected_sensor
             confirm_message_is_displayed = True
             confirm_message = f"""
-            Les données de ton fichier vont étre intégrées au capteur existant {sensor_select}.  
+            Les données de ton fichier vont étre intégrées au capteur existant F{selected_sensor}.  
             click ok, pour lancer l'intégration.
     
             click annuler, pour arrêter l'ingestion, puis choisis ou crée le bon capteur.      
     """
 
-            sensor_dict = {'Id': sensor_select, 'Num': num, 'Modele': model,
-                           'Reseau': net[0] if type(net) == list else net,
-                           'Ligne': line[0] if type(line) == list else line,
-                           'Zone': zone, 'Lieu': lieu,
-                           'pk': np.float64('nan') if pk == '' else float(pk),
-                           'Latitude': float(lat), 'Longitude': float(long), 'Date_pose': date_pose,
-                           'Date_depose': date_depose,
-                           'Ouverture_pose': np.float64('nan') if delta == '' else float(delta),
-                           'Divers': divers}
         else:
-
-            # ne marche pas à partir de 10 capteurs
-
             query = db.select(Sensor.Id).order_by(desc(Sensor.Id))
-            sensor_last = db.session.execute(query).scalar()
-            sensor_last_number = int(sensor_last.split("F")[1]) if sensor_last else 0
-            sensor_created_number = sensor_last_number + 1
-            sensor_created = "F" + str(sensor_created_number)
+            last_sensor_number = db.session.execute(query).scalar()
+            created_sensor_number = int(last_sensor_number) + 1 if last_sensor_number else 0
+            ingest_sensor = created_sensor_number
 
             confirm_message_is_displayed = True
 
             confirm_message = f"""
     Les données de ton fichier concernent un NOUVEAU capteur.
-    Ce capteur s'appelera {sensor_created}.  
+    Ce capteur s'appelera F{created_sensor_number}.  
     Vérifies bien que ton capteur n'existe pas sous un autre nom.     
     Press OK pour lancer l'ingestion.
     """
 
-            sensor_dict = {'Id': sensor_created, 'Num': num, 'Modele': model,
-                           'Reseau': net[0] if type(net) == list else net,
-                           'Ligne': line[0] if type(line) == list else line,
-                           'Zone': zone, 'Lieu': lieu,
-                           'pk': np.float64('nan') if pk == '' else float(pk),
-                           'Latitude': float(lat), 'Longitude': float(long), 'Date_pose': date_pose,
-                           'Date_depose': date_depose,
-                           'Ouverture_pose': np.float64('nan') if delta == '' else float(delta),
-                           'Divers': divers}
+        sensor_dict = {'Id': ingest_sensor, 'Num': num, 'Modele': model,
+                       'Reseau': net[0] if type(net) == list else net,
+                       'Ligne': line[0] if type(line) == list else line,
+                       'Zone': zone, 'Lieu': lieu,
+                       'pk': np.float64('nan') if pk == '' else float(pk),
+                       'Latitude': float(lat), 'Longitude': float(long), 'Date_pose': date_pose,
+                       'Date_depose': date_depose,
+                       'Ouverture_pose': np.float64('nan') if delta == '' else float(delta),
+                       'Divers': divers}
 
         return confirm_message_is_displayed, confirm_message, sensor_dict, ingest_card_message, ""
 
@@ -414,31 +372,32 @@ def register_owner_callbacks(dash_app):
 
         else:
             sensor_id = new_sensor_dict["Id"]
+            sensor_table = "F" + str(sensor_id)
             df = pd.DataFrame(data)
 
-            def create_table(sensor_id):
+            def create_table(sensor_name):
                 class Measure(db.Model):
-                    __tablename__ = sensor_id
+                    __tablename__ = sensor_name
                     unix = db.Column(db.Integer, primary_key=True)
                     mm = db.Column(db.Float)
                     celsius = db.Column(db.Float)
 
                 db.create_all()
 
-            create_table(sensor_id)
+            create_table(sensor_table)
 
-            table_length_before = db.session.execute(text(f"SELECT COUNT(*) FROM {sensor_id};")).scalar()
+            table_length_before = db.session.execute(text(f"SELECT COUNT(*) FROM {sensor_table};")).scalar()
             for index, row in df.iterrows():
                 db.session.execute(
-                    text(f"INSERT OR IGNORE INTO {sensor_id} (unix, mm, celsius) VALUES (:unix, :mm, :celsius)"),
+                    text(f"INSERT OR IGNORE INTO {sensor_table} (unix, mm, celsius) VALUES (:unix, :mm, :celsius)"),
                     {'unix': row['unix'], 'mm': row['mm'], 'celsius': row['celsius']}
                 )
 
             db.session.commit()
-            table_length_after = db.session.execute(text(f"SELECT COUNT(*) FROM {sensor_id};")).scalar()
+            table_length_after = db.session.execute(text(f"SELECT COUNT(*) FROM {sensor_table};")).scalar()
             table_length = table_length_after - table_length_before
             database_info = (
-                [f" # Information sur l'ingestion : le capteur {sensor_id} a {table_length} nouvelles mesures."])
+                [f" # Information sur l'ingestion : le capteur {sensor_table} a {table_length} nouvelles mesures."])
 
             sensors_df = pd.DataFrame(data=sensors_json)
 

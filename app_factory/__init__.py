@@ -6,13 +6,11 @@ from functools import wraps
 # from logging.handlers import TimedRotatingFileHandler
 
 from dash import Dash
-from flask import Flask, render_template, redirect, url_for, request, abort
+from flask import Flask, redirect, url_for, abort
 from flask.helpers import get_root_path
-from flask_login import LoginManager, login_required, current_user
+from flask_login import LoginManager, current_user
 from flask_sqlalchemy import SQLAlchemy
 from flask import Blueprint
-
-
 
 bp = Blueprint('main_blueprint', __name__, static_folder='static', template_folder='template')
 from . import routes
@@ -53,14 +51,10 @@ def create_app():
 
         app.register_blueprint(bp)
 
-        from . import auth, guest, owner
+        from . import auth
         app.register_blueprint(auth.bp, url_prefix='/auth')
-        app.register_blueprint(guest.bp, url_prefix='/guest')
-        app.register_blueprint(owner.bp, url_prefix='/owner')
-
         # Create Database Models
         db.create_all()
-
 
         dash_debug = app.config["DASH_DEBUG"]
         dash_auto_reload = app.config["DASH_AUTO_RELOAD"]
@@ -75,17 +69,15 @@ def create_app():
             meta_tags=[meta_viewport],
             serve_locally=True
         )
-        from .owner.layout import layout as owner_layout
+        from app_factory.layout import owner_layout
         dash_app_fissurolog_owner.layout = owner_layout
 
-        from .owner.callbacks import register_callbacks
-        from .owner.callbacks import register_owner_callbacks
+        from app_factory.callbacks import register_callbacks
+        from app_factory.callbacks import register_owner_callbacks
         dash_app_fissurolog_owner.enable_dev_tools(debug=dash_debug, dev_tools_hot_reload=dash_auto_reload)
 
         for call_back_func in [register_callbacks, register_owner_callbacks]:
             call_back_func(dash_app_fissurolog_owner)
-
-
 
         dash_app_fissurolog_guest = Dash(
             __name__,
@@ -97,13 +89,12 @@ def create_app():
             serve_locally=True
         )
 
-        from .guest.layout import layout as guest_layout
+        from app_factory.layout import guest_layout
         dash_app_fissurolog_guest.layout = guest_layout
 
         dash_app_fissurolog_guest.enable_dev_tools(debug=dash_debug, dev_tools_hot_reload=dash_auto_reload)
 
         register_callbacks(dash_app_fissurolog_guest)
-
 
         def dash_login_required(funct, role):
             @wraps(funct)
@@ -116,12 +107,11 @@ def create_app():
 
             return decorated_view
 
-
         # ajout du décorateur pour sécuriser les callbacks Dash
         for view_func in app.view_functions:
             if view_func.startswith('/dash_fissurolog_owner/'):
-                app.view_functions[view_func] = dash_login_required(app.view_functions[view_func],'owner')
+                app.view_functions[view_func] = dash_login_required(app.view_functions[view_func], 'owner')
             if view_func.startswith('/dash_fissurolog_guest/'):
-                app.view_functions[view_func] = dash_login_required(app.view_functions[view_func],'guest')
+                app.view_functions[view_func] = dash_login_required(app.view_functions[view_func], 'guest')
 
         return app
