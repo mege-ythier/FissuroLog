@@ -34,13 +34,13 @@ def create_app():
 
     # Création d'un objet journal create logger
     logging.config.fileConfig('logging.conf', disable_existing_loggers=True)
-    logger = logging.getLogger(__name__)
+    mylogger = logging.getLogger(__name__)
 
-    logger.debug('debug message debut application')
+    mylogger.info("Démarrage de l'application")
 
     app = Flask(__name__, instance_relative_config=False)
 
-    # fonfigure flask app et sql alchemy
+    # configure flask app et sql alchemy
     app.config.from_object('config.Config')
 
     login_manager.init_app(app)
@@ -53,7 +53,8 @@ def create_app():
 
         from . import auth
         app.register_blueprint(auth.bp, url_prefix='/auth')
-        # Create Database Models
+        # Create Database
+        #db.drop_all()
         db.create_all()
 
         dash_debug = app.config["DASH_DEBUG"]

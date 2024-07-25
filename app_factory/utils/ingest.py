@@ -1,15 +1,12 @@
 import base64
 import io
-import sqlite3
-
 import numpy as np
 from dash import html
 import pandas as pd
 from dash.dash_table import DataTable
 from dash.exceptions import PreventUpdate
-from sqlalchemy.orm import session
 
-from app_factory.models import SensorImage, Sensor
+from app_factory.models import SensorImage, SensorInfo
 from datetime import datetime
 
 from sqlalchemy import update
@@ -124,83 +121,19 @@ def parse_file_and_update_ingest_card(contents, filename):
             )
 
 
-
-
-def save_sensors_info(db, sensors_json, new_sensor_dict):
-    sensors_dtype = {'Id': str, 'Num': str, 'Modele': str, 'Reseau': str, 'Ligne': str, 'Zone': str, 'Lieu': str,
-                     'pk': np.float64, 'Latitude': np.float64, 'Longitude': np.float64, 'Date_pose': str,
-                     'Date_depose': str, 'Ouverture_pose': np.float64, 'Divers': str}
-
-    sensors_df = pd.DataFrame(data=sensors_json, columns=sensors_dtype.keys())
-    sensors_df = sensors_df.astype(sensors_dtype)
-
+def save_old_sensors_info(db, sensors_json, new_sensor_dict):
     # le sensor mis a jour
     sensor_id = new_sensor_dict["Id"]
-    # cas 1 : ajout de mesures  à un capteur existant
-    if 'Id' in sensors_df.columns and sensor_id in sensors_df['Id'].values:
-
-        # dans le store
-        sensors_df.set_index('Id', inplace=True)
-        sensors_df.loc[sensor_id, :] = pd.Series(new_sensor_dict)  # new
-        sensors_df.reset_index(inplace=True)
-        sensors_json = sensors_df.to_dict("records")
-
-        # dans la database
-        new_sensor_dict['Date_pose'] = datetime.strptime(new_sensor_dict['Date_pose'], '%d/%m/%Y')
-        new_sensor_dict['Date_depose'] = None if new_sensor_dict['Date_depose'] == "" else datetime.strptime(
-            new_sensor_dict['Date_depose'], '%d/%m/%Y')
-
-        db.session.execute(update(Sensor), [new_sensor_dict])
-        db.session.commit()
-
-
-
-    # cas2 : ajout de mesures  d'un nouveau capteur
-    else:
-        # BUG PREMIERE INJECTION
-        sensors_json.append(new_sensor_dict)
-
-        sensor = Sensor(
-            Id=new_sensor_dict["Id"],
-            Reseau=new_sensor_dict["Reseau"][0] if type(new_sensor_dict["Reseau"]) == list else new_sensor_dict[
-                "Reseau"],
-            Ligne=new_sensor_dict["Ligne"][0] if type(new_sensor_dict["Ligne"]) == list else new_sensor_dict[
-                "Ligne"],
-            Modele=new_sensor_dict["Modele"],
-            Latitude=float(new_sensor_dict["Latitude"]),
-            Longitude=float(new_sensor_dict["Longitude"]),
-            Ouverture_pose=None if new_sensor_dict["Ouverture_pose"] == None else float(
-                new_sensor_dict["Ouverture_pose"]),
-            Date_pose=datetime.strptime(new_sensor_dict['Date_pose'], '%d/%m/%Y'),
-            Date_depose=None if new_sensor_dict['Date_depose'] == '' else datetime.strptime(
-                new_sensor_dict['Date_depose'], '%d/%m/%Y'),
-            Num=new_sensor_dict["Num"],
-            pk=None if new_sensor_dict["pk"] == None else float(new_sensor_dict["pk"]),
-            Divers=new_sensor_dict["Divers"],
-            Zone=new_sensor_dict["Zone"],
-            Lieu=new_sensor_dict["Lieu"])
-        db.session.add(sensor)
-        db.session.commit()
-    return sensors_json
-
-
-def save_old_sensors_info(db, sensors_df, new_sensor_dict):
-    # le sensor mis a jour
-    sensor_id = new_sensor_dict["Id"]
-
-
 
     sensors_dtype = {'Id': str, 'Num': str, 'Modele': str, 'Reseau': str, 'Ligne': str, 'Zone': str,
                      'Lieu': str,
                      'pk': np.float64, 'Latitude': np.float64, 'Longitude': np.float64, 'Date_pose': str,
                      'Date_depose': str, 'Ouverture_pose': np.float64, 'Divers': str}
 
+    sensors_df = pd.DataFrame(data=sensors_json)
     sensors_df = sensors_df.astype(sensors_dtype)
     sensors_df.set_index('Id', inplace=True)
-
-
     sensors_df.loc[sensor_id, :] = pd.Series(new_sensor_dict,dtype=object)  # new #A VERIFIER pour la colonne id
-
     sensors_df.reset_index(inplace=True)
     sensors_json = sensors_df.to_dict("records")
 
@@ -209,7 +142,7 @@ def save_old_sensors_info(db, sensors_df, new_sensor_dict):
     new_sensor_dict['Date_depose'] = None if new_sensor_dict['Date_depose'] == "" else datetime.strptime(
         new_sensor_dict['Date_depose'], '%d/%m/%Y')
 
-    db.session.execute(update(Sensor), [new_sensor_dict])
+    db.session.execute(update(SensorInfo), [new_sensor_dict])
     db.session.commit()
 
     return sensors_json
@@ -218,7 +151,7 @@ def save_old_sensors_info(db, sensors_df, new_sensor_dict):
 def save_new_sensors_info(db, sensors_json, new_sensor_dict):
     sensors_json.append(new_sensor_dict)
 
-    sensor = Sensor(
+    sensor = SensorInfo(
         Id=new_sensor_dict["Id"],
         Reseau=new_sensor_dict["Reseau"][0] if type(new_sensor_dict["Reseau"]) == list else new_sensor_dict[
             "Reseau"],
@@ -251,9 +184,13 @@ def save_image_in_database(image_uploaded, image_name, db, sensor_id: str):
             if content_format != "data:image/png;base64":
                 raise ValueError("Erreur : le fichier n'est pas une image au format png")
             decoded = base64.b64decode(content_string)
+            if len(decoded) > 4000000:
+                raise ValueError("Erreur : l'image est supérieur à 5Mo'")
 
         except (AttributeError, ValueError) as e:
-            image_uploaded_info = [f"# information sur l'intégration des images: {e}"]
+            image_uploaded_info = [f" ECHEC: {e}"]
+
+
         else:
 
             image = SensorImage(
@@ -263,8 +200,9 @@ def save_image_in_database(image_uploaded, image_name, db, sensor_id: str):
             )
             db.session.add(image)
             db.session.commit()
-            image_uploaded_info = [f"# information sur l'intégration des images: succes {image_name}"]
+            image_uploaded_info = [f" SUCCES: ajout de {image_name}"]
     else:
-        image_uploaded_info = ["# information sur l'intégration des images:  aucun fichier téléchargé par l'utilisateur"]
+        image_uploaded_info = ["aucun fichier téléchargé"]
 
     return image_uploaded_info
+

@@ -3,7 +3,6 @@
 from flask_login import UserMixin
 from werkzeug.security import check_password_hash, generate_password_hash
 
-
 from app_factory import db
 
 
@@ -12,7 +11,7 @@ class User(UserMixin, db.Model):
 
     __tablename__ = "flasklogin_users"
 
-    id = db.Column(db.String(5), primary_key=True)
+    id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(40), unique=True, nullable=False)
     role = db.Column(db.String(10), nullable=False)
     password = db.Column(db.String(200), primary_key=False, unique=False, nullable=False)
@@ -35,13 +34,12 @@ class User(UserMixin, db.Model):
         return f"<User id={self.id}, email={self.email},role={self.role}, >"
 
 
-
-class Sensor(db.Model):
+class SensorInfo(db.Model):
     """sensor model."""
 
-    __tablename__ = "sensors_tb"
+    __tablename__ = "sensors_info_tb"
 
-    Id = db.Column(db.String(5), primary_key=True)
+    Id = db.Column(db.Integer, primary_key=True)
     Num = db.Column(db.String(10))
     Modele = db.Column(db.String(10))
     Reseau = db.Column(db.String(5))
@@ -61,10 +59,8 @@ class Sensor(db.Model):
 
 
 class SensorImage(db.Model):
-    __tablename__ = "sensor_images"
+    __tablename__ = "sensors_image_tb"
     id = db.Column(db.Integer, primary_key=True)
-    sensor_id = db.Column(db.String(5), db.ForeignKey('sensors_tb.Id'), nullable=False)
+    sensor_id = db.Column(db.Integer, db.ForeignKey('sensors_info_tb.Id'), nullable=False)
     name = db.Column(db.String(150), nullable=False)
     data = db.Column(db.LargeBinary, nullable=False)
-
-

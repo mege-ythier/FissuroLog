@@ -3,6 +3,7 @@ import numpy as np
 import plotly.graph_objects as go
 import pandas as pd
 import json
+from sqlalchemy import text
 
 
 def create_time_series_fig(df, table_name, delta_mm):
@@ -341,7 +342,7 @@ def create_map(sensors_json: list[dict], sensor_index):
                     lon=[sensor["Longitude"]],
                     hoverlabel=dict(bgcolor="black", font=dict(color="white"), namelength=15),
                     customdata=[sensor],
-                    hovertemplate='<b>%{customdata[0]} </b><br><br>'
+                    hovertemplate='Fissuromètre <b>%{customdata[0]} </b><br><br>'
                                   'Date de la pose: %{customdata[10]}<br>'
                                   'Modèle: %{customdata[2]}<br>'
                                   'localisation :%{customdata[5]}<br>'
@@ -382,41 +383,40 @@ def query_time_series_data_and_create_fig(db, sensor_id, start_date, end_date, a
     end_date_timestamp = datetime.strptime(end_date, "%Y-%m-%d").timestamp()
     query = ""
 
-    if db.engine.name == 'sqlite':
-
-        query = f"""
-        SELECT strftime('%Y-%m-%d %H:%M:%S', datetime(unix,'unixepoch')) AS Date,mm,celsius
+    if aggregate == "non":
+        query = text(f"""
+        SELECT *
         FROM F{sensor_id}
         WHERE  unix > {start_date_timestamp} and unix < {end_date_timestamp}
-        """
-        if aggregate == "oui":
-            query = f"""
-                SELECT  strftime('%Y-%m-%d %H:00:00', datetime(unix,'unixepoch')) AS Date ,mm,celsius
+        """)
+        df = pd.read_sql(query, con=db.engine)
+        df['Date'] = pd.to_datetime(df['unix'], unit='s')
+        df.drop('unix', axis=1)
+
+    else:
+        if db.engine.name == 'sqlite':
+
+            query = text(f"""
+                SELECT  strftime('%Y-%m-%d %H:00:00', datetime(unix,'unixepoch')) AS Date, mm, celsius
                 FROM F{sensor_id}
                 WHERE unix > {start_date_timestamp} and unix < {end_date_timestamp}
                 GROUP BY Date
                 ORDER BY Date
-            """
-    if db.engine.name == 'mysql':
+            """)
+        if db.engine.name == 'mysql':
 
-        query = f"""
-        SELECT DATE_FORMAT(FROM_UNIXTIME(unix), '%Y-%m-%d %H:%M:%S') AS Date, mm, celsius
-        FROM F{sensor_id}
-        WHERE  unix > {start_date_timestamp} and unix < {end_date_timestamp}
-        """
-        if aggregate == "oui":
-            query = f"""
-                SELECT DATE_FORMAT(FROM_UNIXTIME(unix), '%Y-%m-%d %H:00:00') AS Date, mm, celsius
+            query = text(
+                f"""
+                SELECT DATE_FORMAT(FROM_UNIXTIME(unix), '%Y-%m-%d %H:00:00') AS Date, AVG(mm) AS mm, AVG(celsius) AS celsius
                 FROM F{sensor_id}
                 WHERE unix > {start_date_timestamp} and unix < {end_date_timestamp}
                 GROUP BY Date
                 ORDER BY Date
-            """
+            """)
 
-    df = pd.read_sql(query, con=db.engine)
+        df = pd.read_sql(query, con=db.engine)
 
     df = df.set_index('Date')
-    df.index.name = "Date"
     size_on_memory = df.memory_usage(index=True, deep=False).sum()
 
     fig_message = "données trop volumineuses pour être affichées, modifier les options"

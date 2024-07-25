@@ -1,4 +1,6 @@
 """Routes for user authentication."""
+
+
 from functools import wraps
 from typing import Optional
 
@@ -8,11 +10,13 @@ from flask_login import current_user, login_user
 from email_validator import validate_email, EmailNotValidError
 from sqlalchemy import update
 
-from app_factory import login_manager,db
+from app_factory import login_manager, db
 from app_factory.models import User
 from .forms import LoginForm, SignupFormForAdmin, ChangePasswordForm, SignupForm
 from . import bp
-
+import logging.config
+logging.config.fileConfig('logging.conf', disable_existing_loggers=True)
+mylogger = logging.getLogger(__name__)
 
 @login_manager.user_loader
 def load_user(user_id: int) -> Optional[User]:
@@ -132,7 +136,10 @@ def login():
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
         if user and user.check_password(password=form.password.data):
+
             login_user(user)
+            mylogger.info(f"{current_user.email} se connecte")
+
             return redirect(url_for(f"/dash_fissurolog_{user.role}/"))
 
         flash("Invalid username/password combination")

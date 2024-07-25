@@ -96,7 +96,7 @@ textarea {
             margin: 0px 0px 0px 0px;
             padding: 0px 0px 0px 0px;
             border: 5px solid rgb(235, 45, 54);
-            height: 51%; 
+            height: 60%;
         }
 
             #select-data-card {
@@ -164,7 +164,7 @@ textarea {
                 }
 
 
-                #button-ingest::after, #button-delete-table::before, #button-update-metadata::before, #button_update_fig::before  {
+                #button-ingest::after, #button-delete-table::before, #button-update-metadata::before{
                     font-family: 'webdings', sans-serif; 
                     color: white;
                     font-size: 3.5em;
@@ -172,6 +172,13 @@ textarea {
                     padding: 5px;
                 }
 
+                #button_update_fig::before {
+                    font-family: 'webdings', sans-serif;
+                    color: white;
+                    font-size: 2em;
+                    border-radius: 45px;
+                    padding: 5px;
+                }
 
                 #button-ingest::after {
                     content: '\1F4E4';
@@ -196,14 +203,18 @@ textarea {
 
                 }
 
+
+
+
                     
-            #upload-card {
+            #measure-upload-card {
                 border: 5px solid rgb(7, 11, 241);
                 display: flex;flex-direction: row;
                 margin: 0px 0px 0px 0px;
                 padding: 0px 10px 0px 0px;
             }
-            #upload-file-dcc {width: 6em}
+
+
                 
 
 
@@ -227,13 +238,13 @@ textarea {
         
         #image-card {
             border: 5px solid rgb(150, 81, 215);
-            
             box-shadow: 10px 5px 5px rgba(32, 32, 33, 0.7);
             padding: 0px 0px 0px 10px;
     }
 
-    carousel-card{background-color: rgba(15, 247, 54, 0.801);}
 
+#upload-file-dcc {width: 6em}
+#upload-image-dcc {width: 6em}
         
 #upload-file-dcc > div , #upload-image-dcc > div {  
     font-size: 0.8em;
