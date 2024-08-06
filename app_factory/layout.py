@@ -1,98 +1,68 @@
 from dash import html, dcc
 
-from app_factory.utils.card import generate_options_card, generate_time_series_card, generate_upload_card, \
-    generate_form_card, generate_button_card, generate_message_card
-from app_factory.utils.fig import create_map
+from app_factory.utils.card import generate_upload_card, generate_form_card, generate_button_card, \
+    generate_message_card, generate_select_card, generate_header, \
+    fig0, generate_image_card
+
 
 # definition de la mise en page de l'application
 owner_layout = html.Div(
-    id="app-container",
+    id="app-card",
     children=[
-        html.Header(
-            id='app-container-header',
-            children=[html.Img(src='/static/img/logo_ratp_infra_pour_dash.png', width='15%', style={'float': 'right'}),
-                      html.H1(id='welcome-info'),
-                      dcc.Location(id='url', refresh=False)],
-            className="header"),
+        generate_header(),
+        html.Div(id='main-card',
+                 children=[
 
-        html.Div(
-            id="app-container-inner",
-            children=[
-                dcc.Store(id='store-map-csv'),
+                     html.Div(
+                         id="left-card",
+                         children=[
+                             dcc.Store(id='store-map-csv'),
+                             html.Div(
+                                 id='top-card', children=[
+                                     generate_button_card(),
+                                     generate_upload_card(),
+                                     generate_select_card(),
+                                     generate_form_card(),
+                                 ]),
 
-                html.Div(
-                    id='data-card', children=[
-                        generate_button_card(),
-                        generate_upload_card(),
-                        html.Div(
-                            id='select-data-card',
-                            children=[
-                                generate_options_card(),
-                                dcc.Graph(id='map',
-                                          config={'displaylogo': False, 'doubleClickDelay': 1000},
-                                          figure=create_map([], -1)),
-                            ]),
+                            generate_message_card(),
 
-                        generate_form_card(),
+                            dcc.Graph(id='time-series', figure=fig0, config={'displaylogo': False}),
 
-                    ]
-                ),
-                generate_message_card(),
-                generate_time_series_card(),
+                            dcc.ConfirmDialog(id='confirm-throw-ingestion'),
+                            dcc.ConfirmDialog(id='confirm-read-message'),
+                            dcc.ConfirmDialog(id='confirm-delete-table'),
+                         ]
+                     ),
+                     generate_image_card()
+                 ]),
 
-                html.Div(id='ingest-info'),
-                dcc.ConfirmDialog(
-                    id='confirm-throw-ingestion'
-                ),
-
-                dcc.ConfirmDialog(
-                    id='confirm-read-message'
-                ),
-                dcc.ConfirmDialog(
-                    id='confirm-delete-table'
-                ),
-
-            ]
-        )
     ]
 )
+
 
 guest_layout = html.Div(
-    id="app-container",
+    id="app-card",
     children=[
-        html.Header(
-            id='app-container-header',
-            children=[
-                html.Img(src='/static/img/logo_ratp_infra_pour_dash.png', width='15%', style={'float': 'right'}),
-                html.H1(id='welcome-info'),
-                dcc.Location(id='url', refresh=False)],
-            className="header"),
+        generate_header(),
+        html.Div(id='main-card',
+                 children=[
 
-        html.Div(
-            id="app-container-inner",
-            children=[
-                dcc.Store(id='store-map-csv'),
+                     html.Div(
+                         id='left-card',
+                         children=[
+                             dcc.Store(id='store-map-csv'),
+                             html.Div(
+                                 id='top-card', children=[
+                                     generate_select_card(),
+                                     generate_form_card(),
+                                 ]),
+                             generate_message_card(),
 
-                html.Div(
-                    id='data-card', children=[
-                        html.Div(
-                            id='select-data-card',
-                            children=[
-                                generate_options_card(),
-                                dcc.Graph(id='map',
-                                          config={'displaylogo': False, 'doubleClickDelay': 1000},
-                                          figure=create_map([], -1)
-                                          )
-                            ]),
+                            dcc.Graph(id='time-series', figure=fig0, config={'displaylogo': False}),
 
-                        generate_form_card(),
+                         ]),
+                     generate_image_card()
+                 ]),
 
-                    ]
-                ),
-                generate_message_card(),
-                generate_time_series_card(),
-
-            ]
-        )
-    ]
-)
+    ])

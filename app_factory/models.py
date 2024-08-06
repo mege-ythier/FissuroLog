@@ -1,6 +1,7 @@
 """Database models."""
 
 from flask_login import UserMixin
+from sqlalchemy.dialects.mysql import LONGBLOB
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app_factory import db
@@ -63,4 +64,5 @@ class SensorImage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     sensor_id = db.Column(db.Integer, db.ForeignKey('sensors_info_tb.Id'), nullable=False)
     name = db.Column(db.String(150), nullable=False)
-    data = db.Column(db.LargeBinary, nullable=False)
+    data = db.Column(LONGBLOB, nullable=False) if db.engine.name == 'mysql' else db.Column(db.LargeBinary, nullable=False)
+    card_id = db.Column(db.Integer)

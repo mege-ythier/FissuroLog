@@ -2,31 +2,30 @@
 import logging
 import logging.config
 from functools import wraps
-# from logging.handlers import RotatingFileHandler
-# from logging.handlers import TimedRotatingFileHandler
-
 from dash import Dash
 from flask import Flask, redirect, url_for, abort
 from flask.helpers import get_root_path
 from flask_login import LoginManager, current_user
 from flask_sqlalchemy import SQLAlchemy
 from flask import Blueprint
+from sqlalchemy import text, MetaData
 
 bp = Blueprint('main_blueprint', __name__, static_folder='static', template_folder='template')
 from . import routes
 
 db = SQLAlchemy()
 login_manager = LoginManager()
+metadata = MetaData()
 
 
-def dash_login_required(func):
-    @wraps(func)
-    def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated:
-            return redirect(url_for('auth.login'))
-        return func(*args, **kwargs)
-
-    return decorated_function
+# def dash_login_required(func):
+#     @wraps(func)
+#     def decorated_function(*args, **kwargs):
+#         if not current_user.is_authenticated:
+#             return redirect(url_for('auth.login'))
+#         return func(*args, **kwargs)
+#
+#     return decorated_function
 
 
 def create_app():
@@ -49,6 +48,7 @@ def create_app():
 
     with app.app_context():
 
+        metadata.reflect(bind=db.engine)
         app.register_blueprint(bp)
 
         from . import auth

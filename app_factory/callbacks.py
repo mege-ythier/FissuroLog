@@ -1,21 +1,22 @@
 import base64
+import time
 from datetime import datetime
 import re
 
 import numpy as np
-from dash import html, Input, Output, State
+from dash import html, Input, Output, State, dcc
 from dash.exceptions import PreventUpdate
 import pandas as pd
 
 from flask_login import current_user
-from sqlalchemy import text, desc
+from sqlalchemy import text, desc, MetaData
 
 from app_factory.models import SensorInfo
 from app_factory.utils.card import fig0, left_column, right_column
 from app_factory.utils.ingest import parse_file_and_update_ingest_card, save_image_in_database, \
     save_new_sensors_info, save_old_sensors_info
 from app_factory.utils.fig import create_map, query_time_series_data_and_create_fig
-from app_factory import db
+from app_factory import db, metadata
 
 import logging.config
 
@@ -32,7 +33,8 @@ def register_callbacks(dash_app):
         if current_user.is_authenticated:
             sensors_dtype = {'Id': str, 'Num': str, 'Modele': str, 'Reseau': str, 'Ligne': str, 'Zone': str,
                              'Lieu': str, 'pk': np.float64, 'Latitude': np.float64, 'Longitude': np.float64,
-                             'Date_pose': 'datetime64[ns]', 'Date_depose': 'datetime64[ns]', 'Ouverture_pose': np.float64}
+                             'Date_pose': 'datetime64[ns]', 'Date_depose': 'datetime64[ns]',
+                             'Ouverture_pose': np.float64}
 
             sensors_df = pd.read_sql('select * from sensors_info_tb', con=db.engine, dtype=sensors_dtype)
 
@@ -41,7 +43,7 @@ def register_callbacks(dash_app):
 
             mylogger.info(f"{current_user.email} ouvre l'application")
 
-            return sensors_df.to_dict('records'), f'Bienvenue {current_user.role} {current_user.email}'
+            return sensors_df.to_dict('records'), f'Bienvenue {current_user.email}'
         else:
 
             return [], "pas d'authentification"
@@ -92,10 +94,21 @@ def register_callbacks(dash_app):
             raise PreventUpdate
 
     @dash_app.callback(
-        Output('graph-time-series', 'figure', allow_duplicate=True),
+        Output('image-card', 'hidden'),
+        Input('map', 'selectedData'),
+        prevent_initial_call=True, interval=10000)
+    def show_image(selected_data):
+        if selected_data is None or (
+                selected_data and 'points' in selected_data.keys() and selected_data['points'] == []):
+            return True
+        else:
+            return False
+
+    @dash_app.callback(
+        Output('time-series', 'figure', allow_duplicate=True),
         Output('button_update_fig', 'hidden', allow_duplicate=True),
-        Output('fig-message', 'children', allow_duplicate=True),
-        Output('image-card', 'children'),
+        Output('upload-image1-dcc', 'children'),
+        Output('upload-image2-dcc', 'children'),
         Output('textarea-model', "value"),
         Output('textarea-num', "value"),
         Output('textarea-zone', "value"),
@@ -107,9 +120,12 @@ def register_callbacks(dash_app):
         Output('textarea-date-depose', "value"),
         Output('textarea-delta', "value"),
         Output('textarea-divers', "value"),
-        Output('dropdown-net', "value"),  # new
-        Output('dropdown-line', "value"),  # new
+        Output('dropdown-net', "value"),
+        Output('dropdown-line', "value"),
         Output('dropdown-table', "value"),
+        Output('fig-message', 'children', allow_duplicate=True),
+        Output('image-message', 'children'),
+        Output('ingest-message', 'children'),
         Input('button_update_fig', 'n_clicks'),
         Input('map', 'selectedData'),
         State('date-picker-select', "start_date"),
@@ -124,8 +140,11 @@ def register_callbacks(dash_app):
         fig = fig0
         fig_message = ("Aucun capteur n'est sélectionné. Click sur la carte pour sélectionner un capteur existant."
                        " Tu peux aussi ajouter un nouveau capteur.")
+        image_message = ""
+        ingest_message = ""
 
-        image_card = html.H3("")
+        image1 = ''
+        image2 = ''
 
         model, num, zone, pk, place = "", "", "", "", ""
         lat, long = "", "",
@@ -171,50 +190,54 @@ def register_callbacks(dash_app):
             if pk is None: pk = ""
             if delta is None: delta = ""
 
-            fig, fig_message = query_time_series_data_and_create_fig(db, sensor_id, start_date, end_date, aggregate, delta)
+            fig, fig_message = query_time_series_data_and_create_fig(db, sensor_id, start_date, end_date, aggregate,
+                                                                     delta)
 
-            try:
-                # a voir : il y a plusieurs images
-                query = f"""
-                            SELECT data
-                            FROM sensors_image_tb
-                            WHERE sensor_id ='{sensor_id}'
-                            ORDER BY id DESC
-                            LIMIT 1
-                            """
+            def image(i):
 
-                image_from_database = db.session.execute(text(query)).scalar()
-                image_encoded = base64.b64encode(image_from_database).decode('utf-8')
+                try:
+                    query = f"""
+                                SELECT data
+                                FROM sensors_image_tb
+                                WHERE sensor_id ='{sensor_id}' AND card_id={i}
+                                ORDER BY id DESC
+                                LIMIT 1
+                                """
+                    image1_from_database = db.session.execute(text(query)).scalar()
+                    image1_encoded = base64.b64encode(image1_from_database).decode('utf-8')
 
+                except:
+                    if current_user.role == 'owner':
+                        return html.Div("Click pour ajouter une image")
 
-            except:
-                image_card = html.H3("il n'y a pas encore d'image du capteur dans les données du dashboard"),
-            else:
-                # a voir png, cherher le format
-                image_card = html.Img(src=f"data:image/png;base64,{image_encoded}", width='100%'),
+                else:
+                    # a voir png, cherher le format
+                    return html.Img(src=f"data:image/png;base64,{image1_encoded}")
 
-        return (fig, True, fig_message,
-                image_card, model, num, zone, place, str(pk), str(lat), str(long), str(date_pose),
-                str(date_depose), str(delta), divers, net, line, sensor_id)
+            image1 = image(1)
+            image2 = image(2)
+
+        return (fig, True, image1, image2, model, num, zone, place, str(pk), str(lat), str(long),
+                str(date_pose), str(date_depose), str(delta), divers, net, line, str(sensor_id),
+                fig_message, image_message, ingest_message)
 
 
 def register_owner_callbacks(dash_app):
     @dash_app.callback(
         Output('button-update-metadata', 'hidden'),
         Output('button-delete-table', 'hidden'),
-        Output('image_ingest_card', 'hidden'),
         Input('map', 'selectedData'),
         prevent_initial_call=True, interval=10000)
     def show_button(selected_data):
         if selected_data is None or (
                 selected_data and 'points' in selected_data.keys() and selected_data['points'] == []):
-            return True, True, True
+            return True, True
         else:
-            return False, False, False
+            return False, False
 
     @dash_app.callback(
         Output('store-data-uploaded', 'data'),
-        Output('upload-card-inner', 'children', allow_duplicate=True),
+        Output('upload-file-inner-card', 'children', allow_duplicate=True),
         Output('button-ingest', 'hidden'),
         Output('textarea-model', 'value', allow_duplicate=True),
         Output('ingest-message', 'children', allow_duplicate=True),
@@ -228,7 +251,7 @@ def register_owner_callbacks(dash_app):
         Output('confirm-throw-ingestion', 'message'),
         Output('store-metadata-to-ingest', 'data'),
         Output('ingest-message', 'children', allow_duplicate=True),
-        Output('upload-card-inner', 'children'),
+        Output('upload-file-inner-card', 'children'),
         Input('button-ingest', 'n_clicks'),
         State('dropdown-table', 'value'),
         State('textarea-model', 'value'),
@@ -336,7 +359,7 @@ def register_owner_callbacks(dash_app):
         Output('store-map-csv', 'data', allow_duplicate=True),
         Output('ingest-message', 'children', allow_duplicate=True),
         Output('dropdown-table', 'value', allow_duplicate=True),
-        Output('graph-time-series', 'figure', allow_duplicate=True),
+        Output('time-series', 'figure', allow_duplicate=True),
         Output('fig-message', 'children', allow_duplicate=True),
         Output('map', 'selectedData'),
         Output('button-ingest', 'hidden', allow_duplicate=True),
@@ -368,13 +391,18 @@ def register_owner_callbacks(dash_app):
                 db.create_all()
 
             create_table(sensor_table)
+            db.session.commit()
 
             table_length_before = db.session.execute(text(f"SELECT COUNT(*) FROM {sensor_table};")).scalar()
             for index, row in df.iterrows():
-                db.session.execute(
-                    text(f"INSERT OR IGNORE INTO {sensor_table} (unix, mm, celsius) VALUES (:unix, :mm, :celsius)"),
-                    {'unix': row['unix'], 'mm': row['mm'], 'celsius': row['celsius']}
-                )
+                parameters = {'unix': row['unix'], 'mm': row['mm'], 'celsius': row['celsius']}
+
+                if db.engine.name == 'sqlite':
+                    query = text(
+                        f"INSERT OR IGNORE INTO {sensor_table} (unix, mm, celsius) VALUES (:unix, :mm, :celsius)")
+                if db.engine.name == 'mysql':
+                    query = text(f"INSERT IGNORE INTO {sensor_table} (unix, mm, celsius) VALUES (:unix, :mm, :celsius)")
+                db.session.execute(query, parameters)
 
             db.session.commit()
             table_length_after = db.session.execute(text(f"SELECT COUNT(*) FROM {sensor_table};")).scalar()
@@ -415,8 +443,8 @@ def register_owner_callbacks(dash_app):
         State('textarea-zone', 'value'),
         State('textarea-divers', 'value'),
         State('textarea-model', 'value'),
-        State('dropdown-net', 'value'),  # new
-        State('dropdown-line', 'value'),  # new
+        State('dropdown-net', 'value'),
+        State('dropdown-line', 'value'),
         Prevent_initial_call=True, interval=10000, prevent_initial_call='initial_duplicate'
 
     )
@@ -424,7 +452,6 @@ def register_owner_callbacks(dash_app):
                             lieu, zone, divers, model, net, line):
         if click is None or sensor_id is None:
             raise PreventUpdate
-
 
         # validation des données du formulaire
         try:
@@ -475,83 +502,93 @@ def register_owner_callbacks(dash_app):
         Output('store-map-csv', 'data', allow_duplicate=True),
         Output('ingest-message', 'children', allow_duplicate=True),
         Output('dropdown-table', 'value', allow_duplicate=True),
-        Output('graph-time-series', 'figure', allow_duplicate=True),
+        Output('time-series', 'figure', allow_duplicate=True),
         Output('fig-message', 'children', allow_duplicate=True),
-        Output('image-card', 'children', allow_duplicate=True),
         Output('form-card', 'children', allow_duplicate=True),
+        Output('image-card', 'hidden', allow_duplicate=True),
         Input('confirm-delete-table', 'submit_n_clicks'),
         State('dropdown-table', 'value'),
         State('store-map-csv', 'data'),
         prevent_initial_call=True, interval=10000)
     def delete_table_final_step(click, sensor_select, sensors_json):
-        if click is None:
-            raise PreventUpdate
-        elif sensor_select is None:
+        if click is None or sensor_select is None:
             raise PreventUpdate
         else:
+            for attempt in range(5):
 
-            db.session.execute(text(f" DELETE FROM sensors_info_tb WHERE Id ='{sensor_select}'"))
-            db.session.execute(text(f"DROP TABLE IF EXISTS F{sensor_select}"))
-            db.session.execute(text(f" DELETE FROM sensor_images WHERE sensor_id ='{sensor_select}'"))
+                try:
+                    if f"F{sensor_select}" in metadata.tables:
+                        table_to_drop = metadata.tables[f"F{sensor_select}"]
+                        table_to_drop.drop(db.engine)
+                    else:
+                        db.session.execute(text(f"DROP TABLE IF EXISTS F{sensor_select}"))
+                    db.session.execute(text(f" DELETE FROM sensors_image_tb WHERE sensor_id ='{sensor_select}'"))
+                    db.session.execute(text(f" DELETE FROM sensors_info_tb WHERE Id ='{sensor_select}'"))
+                    sensors_df = pd.DataFrame(sensors_json)
+                    sensors_df.set_index("Id", inplace=True)
+                    sensor_select_dict = sensors_df.loc[sensor_select, :].to_dict()
+                    sensors_df.drop(sensor_select, inplace=True, axis=0)
+                    sensors_df.reset_index(inplace=True)
 
-            sensors_df = pd.DataFrame(sensors_json)
-            sensors_df.set_index("Id", inplace=True)
-            sensor_select_dict = sensors_df.loc[sensor_select,:].to_dict()
-            sensors_df.drop(sensor_select, inplace=True, axis=0)
-            sensors_df.reset_index(inplace=True)
-            db.session.commit()
+                    db.session.commit()
+                    mylogger.info(f"{current_user.email} supprime le fissuromètre {sensor_select_dict}")
+                    fig_message = (
+                        "Aucun capteur n'est sélectionné. Click sur la carte pour sélectionner un capteur existant."
+                        " Tu peux aussi ajouter un nouveau capteur.")
+                    ingest_message = f'capteur {sensor_select} supprimé'
 
-            fig = fig0
-            fig_message = ("Aucun capteur n'est sélectionné. Click sur la carte pour sélectionner un capteur existant."
-                           " Tu peux aussi ajouter un nouveau capteur.")
+                    fig = fig0
+                    return sensors_df.to_dict('records'), ingest_message, "", fig, fig_message, [left_column,
+                                                                                                 right_column], True
+                except Exception as e:
+                    mylogger.info(f"Tentative {attempt + 1} échouée: {e}")
+                    db.session.close_all()
+                    db.engine.dispose()
+                    time.sleep(2)
 
-            mylogger.info(f"{current_user.email} supprime le fissuromètre {sensor_select_dict}")
-
-            return sensors_df.to_dict('records'), f'capteur {sensor_select} supprimé', "", fig, fig_message, "", [
-                left_column, right_column]
+            mylogger.info(f"Échec après 5 tentatives.")
+            raise PreventUpdate
 
     @dash_app.callback(
-        Output('text-error-upload-image', 'children', allow_duplicate=True),
-        Input('upload-image-dcc', 'contents'),
-        State('upload-image-dcc', 'filename'),
+        Output('image-message', 'children', allow_duplicate=True),
+        Output('upload-image1-dcc', 'children', allow_duplicate=True),
+        Input('upload-image1-dcc', 'contents'),
+        State('upload-image1-dcc', 'filename'),
         State('map', 'selectedData'),
         prevent_initial_call=True
     )
-    def ingest_image(image_contents, image_name, selected_data):
-        """
-        Prends le contenu téléchargé, le formate, et l'enregistre dans la database, renvoie un message
+    def ingest_image1(image_contents, image_name, selected_data):
 
-        """
+        upload_info = save_image_in_database(
+            db=db,
+            selected_data=selected_data,
+            image_content=image_contents,
+            image_name=image_name,
+            card_id=1)
 
-        if selected_data and 'points' in selected_data.keys() and selected_data['points'] != []:
-            sensor_id = selected_data['points'][0]['customdata'][0]
-
-            image_upload_info = save_image_in_database(
-                image_uploaded=image_contents,
-                image_name=image_name,
-                db=db,
-                sensor_id=sensor_id)
-
-            return image_upload_info
+        if upload_info.split(":")[0] == "SUCCES":
+            return upload_info, html.Img(src=image_contents, width='100%')
         else:
             raise PreventUpdate
 
     @dash_app.callback(
-        Output('image-card', 'children', allow_duplicate=True),
-        Input('upload-image-dcc', 'contents'),
+        Output('image-message', 'children', allow_duplicate=True),
+        Output('upload-image2-dcc', 'children', allow_duplicate=True),
+        Input('upload-image2-dcc', 'contents'),
+        State('upload-image2-dcc', 'filename'),
+        State('map', 'selectedData'),
         prevent_initial_call=True
     )
-    def show_image(image_contents):
-        try:
-            content_format, content_string = image_contents.split(',')
-            if content_format != "data:image/png;base64":
-                raise ValueError("Erreur : le fichier n'est pas une image au format png")
-            decoded = base64.b64decode(content_string)
-            if len(decoded) > 4000000:
-                raise ValueError("Erreur : l'image est supérieur à 5Mo'")
+    def ingest_image2(image_contents, image_name, selected_data):
 
-        except (AttributeError, ValueError) as e:
-            raise PreventUpdate
+        upload_info = save_image_in_database(
+            db=db,
+            selected_data=selected_data,
+            image_content=image_contents,
+            image_name=image_name,
+            card_id=2)
 
+        if upload_info.split(":")[0] == "SUCCES":
+            return upload_info, html.Img(src=image_contents, width='100%')
         else:
-            return html.Img(src=f"data:image/png;base64,{content_string}", width='100%')
+            raise PreventUpdate

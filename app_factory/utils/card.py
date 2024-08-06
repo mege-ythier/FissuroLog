@@ -6,6 +6,8 @@ from dateutil.relativedelta import relativedelta
 from datetime import datetime
 import json
 
+from app_factory.utils.fig import create_map
+
 with open("./data_ratp/traces-du-reseau-de-transport-ferre-ratp.geojson", "r") as lines:
     ratp_dict = json.load(lines)
 
@@ -29,15 +31,6 @@ fig0.update_layout(
     yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, title=None),
 )
 
-
-def generate_time_series_card():
-    return html.Div(
-        id='time-series-card',
-        children=[
-            dcc.Graph(id='graph-time-series', figure=fig0, config={'displaylogo': False}),
-            html.Div(id='image-card'),
-        ],
-    )
 
 
 def generate_options_card():
@@ -80,14 +73,14 @@ def generate_upload_card():
     return html.Div(
         children=[
             html.Div(
-                id="measure-upload-card",
+                id="upload-file-card",
                 children=[
                     dcc.Upload(
                         id='upload-file-dcc',
                         children="Télécharger des mesures",
                         multiple=False
                     ),
-                    html.Div(id='upload-card-inner'),
+                    html.Div(id='upload-file-inner-card'),
                     dcc.Store(id='store-data-uploaded')]),
             html.Button(id='button-ingest', hidden=True, title='intégrer les mesures dans la database'),
         ])
@@ -116,7 +109,7 @@ left_column = html.Div(
         html.H5("Date de la pose *"),
         dcc.Textarea(
             id='textarea-date-pose',
-            value='',
+            value='01/01/2000',
             rows=1
         ),
         html.H5("Ouverture à la pose"),
@@ -129,7 +122,7 @@ left_column = html.Div(
         html.H5("Latitude *"),
         dcc.Textarea(
             id='textarea-lat',
-            value='',
+            value='48.86461089629031',
             rows=1
         ),
         html.H5("localisation dans le réseau"),
@@ -165,7 +158,7 @@ right_column = html.Div([
     html.H5("localisation dans l'ouvrage *"),
     dcc.Textarea(
         id='textarea-zone',
-        value='',
+        value='test',
         maxLength=20,
         title='exemple : voute, piedroit .....',
         rows=1
@@ -173,7 +166,7 @@ right_column = html.Div([
     html.H5("Longitude *"),
     dcc.Textarea(
         id='textarea-long',
-        value='',
+        value='2.3300408349807364',
         rows=1
     ),
 
@@ -205,22 +198,11 @@ def generate_button_card():
         id="button-card",
         children=[
 
-            html.Div(id="image_ingest_card",
-                     hidden=True,
-                     children=[
-                         dcc.Upload(
-                             id='upload-image-dcc',
-                             children="télécharger une image",
-                             multiple=False
-                         )]),
-
             html.Button(title='Supprimer le capteur',
                         id='button-delete-table', hidden=True, ),
             html.Button(title='modifier les informations du capteur', id='button-update-metadata', hidden=True),
 
-
         ])
-
 
 
 def generate_message_card():
@@ -229,7 +211,7 @@ def generate_message_card():
         children=[
             html.H3(id='fig-message'),
             html.H3(id='ingest-message'),
-            html.H3(id="text-error-upload-image"),
+            html.H3(id="image-message"),
 
         ])
 
@@ -337,5 +319,30 @@ def generate_form_card_test():
                     ])
 
 
+def generate_select_card():
+    return html.Div(
+        id='select-card',
+        children=[
+            generate_options_card(),
+            dcc.Graph(id='map',
+                      config={'displaylogo': False, 'doubleClickDelay': 1000},
+                      figure=create_map([], -1)
+                      )
+        ])
 
 
+def generate_header():
+    return html.Header(
+        id='header-card',
+        children=[html.Img(src='/static/img/logo_ratp_infra_pour_dash.png', width='15%', style={'float': 'right'}),
+                  html.H1(id='welcome-info'),
+                  html.A('menu', href='/'),
+                  dcc.Location(id='url', refresh=False)],
+        className="header")
+
+
+def generate_image_card():
+    return html.Div(id='image-card', hidden=True,
+                    children=[dcc.Upload(id='upload-image1-dcc', multiple=False),
+                              dcc.Upload(id='upload-image2-dcc', multiple=False),
+                              dcc.Upload(id='upload-image3-dcc', multiple=False)])

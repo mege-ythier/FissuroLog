@@ -9,7 +9,8 @@ from dash.exceptions import PreventUpdate
 from app_factory.models import SensorImage, SensorInfo
 from datetime import datetime
 
-from sqlalchemy import update
+from sqlalchemy import update, text
+
 
 def parse_file_and_update_ingest_card(contents, filename):
     provider = ""
@@ -33,7 +34,7 @@ def parse_file_and_update_ingest_card(contents, filename):
                 'Capteur(mm)': float,
                 'Temp Int(°C)': float}
 
-            if content_type == "data:text/csv;base64":
+            if content_type == "data:text/csv;base64" or content_type =="data:application/vnd.ms-excel;base64" :
                 df = pd.read_csv(io.StringIO(decoded.decode('ISO-8859-1')), dtype=ginger_schema, sep=";", decimal=",")
                 columns_selected = [col for col in df.columns if col in ginger_schema.keys()]
                 df = df[columns_selected]
@@ -175,12 +176,14 @@ def save_new_sensors_info(db, sensors_json, new_sensor_dict):
     return sensors_json
 
 
-def save_image_in_database(image_uploaded, image_name, db, sensor_id: str):
-    if image_uploaded:
+def save_image_in_database(db, selected_data, image_content, image_name, card_id):
+
+    if selected_data and 'points' in selected_data.keys() and selected_data['points'] != [] and image_content:
+        sensor_id = selected_data['points'][0]['customdata'][0]
 
         try:
             # a ameliorer
-            content_format, content_string = image_uploaded.split(',')
+            content_format, content_string = image_content.split(',')
             if content_format != "data:image/png;base64":
                 raise ValueError("Erreur : le fichier n'est pas une image au format png")
             decoded = base64.b64decode(content_string)
@@ -188,21 +191,42 @@ def save_image_in_database(image_uploaded, image_name, db, sensor_id: str):
                 raise ValueError("Erreur : l'image est supérieur à 5Mo'")
 
         except (AttributeError, ValueError) as e:
-            image_uploaded_info = [f" ECHEC: {e}"]
-
+            image_uploaded_info = f" ECHEC: {e}"
 
         else:
 
-            image = SensorImage(
-                name=image_name,
-                sensor_id=sensor_id,
-                data=decoded
-            )
-            db.session.add(image)
+            query = text(f"""
+                 SELECT id
+                 FROM sensors_image_tb
+                 WHERE sensor_id= {sensor_id} AND card_id={card_id}
+                 """)
+            image_id = db.session.execute(query).scalar()
+
+            if image_id:
+                image_dict = dict(
+                    id=image_id,
+                    name=image_name,
+                    sensor_id=sensor_id,
+                    data=decoded,
+                    card_id=card_id
+                )
+                db.session.execute(update(SensorImage), [image_dict])
+
+            else:
+                image = SensorImage(
+                    name=image_name,
+                    sensor_id=sensor_id,
+                    data=decoded,
+                    card_id=card_id
+                )
+                db.session.add(image)
             db.session.commit()
-            image_uploaded_info = [f" SUCCES: ajout de {image_name}"]
+            image_uploaded_info = f"SUCCES: ajout de {image_name}"
+
+
+
     else:
-        image_uploaded_info = ["aucun fichier téléchargé"]
+        image_uploaded_info = "ECHEC: aucun fichier téléchargé"
 
     return image_uploaded_info
 
