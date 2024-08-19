@@ -1,11 +1,11 @@
 import base64
 import io
 import numpy as np
-from dash import html
 import pandas as pd
 from dash.dash_table import DataTable
 from dash.exceptions import PreventUpdate
 
+from app_factory import mylogger
 from app_factory.models import SensorImage, SensorInfo
 from datetime import datetime
 
@@ -83,21 +83,16 @@ def parse_file_and_update_ingest_card(contents, filename):
                     else:
                         raise ValueError("Erreur : Le fichier txt ne correspond pas au schéma")
 
-                    # todo cas ou il y a pas les degres celcus ,3d(M5 raccordsaintmartin)
 
         except Exception as e:
+            mylogger.warning(f"erreur dans le parsing {e}")
             return (
                 {},  # store-data-uploaded'
                 # upload-card-inner
-                html.Div(children=[
-                    html.H3("Information sur le fichier téléchargé"),
-                    html.H4(f"Le nom du fichier est {filename}."),
-                    html.H4(f'{e} , Contactes amandine.mege-ythier@ratp.fr')
-                ]),
-
-                False,  # button-ingest
+                "",
+                True,  # button-ingest-hidden
                 f"",  # textarea-model
-                "erreur dans le parsing",  # ingest-message
+                "Erreur dans le parsing, verifies le fichier, Contactes amandine.mege-ythier@ratp.fr",  # ingest-message
             )
 
 
@@ -105,18 +100,14 @@ def parse_file_and_update_ingest_card(contents, filename):
             return (
                 df.drop("Date", axis=1).to_dict('records'),  # store-data-uploaded'
                 # upload-card-inner
-                html.Div([
-                    html.H4(f"fichier {filename} téléchargé"),
                     DataTable(
                         data=df.drop("unix", axis=1).to_dict('records'),
                         columns=[{'name': i, 'id': i} for i in df.drop("unix", axis=1).columns],
                         page_size=10
                     ),
-
-                ]),
                 False,  # button-card
                 f"{provider}",  # textarea-sensor-model
-                "Tu peux lancer l'intégration des mesures téléchargées à la database en appuyant sur le bouton correspond.",
+                f"Complètes la fiche du capteur ,puis lances l'intégration du fichier {filename}."
             # ingest-message
 
             )
@@ -221,7 +212,7 @@ def save_image_in_database(db, selected_data, image_content, image_name, card_id
                 )
                 db.session.add(image)
             db.session.commit()
-            image_uploaded_info = f"SUCCES: ajout de {image_name}"
+            image_uploaded_info = f"SUCCES: ajout de l'image {image_name}"
 
 
 

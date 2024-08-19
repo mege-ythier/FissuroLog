@@ -1,6 +1,6 @@
 from dash import html, dcc
 
-from app_factory.utils.card import generate_upload_card, generate_form_card, generate_button_card, \
+from app_factory.utils.card import generate_form_card, generate_owner_card, \
     generate_message_card, generate_select_card, generate_header, \
     fig0, generate_image_card
 
@@ -16,13 +16,14 @@ owner_layout = html.Div(
                      html.Div(
                          id="left-card",
                          children=[
-                             dcc.Store(id='store-map-csv'),
+                             dcc.Store(id='store-sensors-info'),
                              html.Div(
                                  id='top-card', children=[
-                                     generate_button_card(),
-                                     generate_upload_card(),
-                                     generate_select_card(),
+                                     generate_owner_card(),
                                      generate_form_card(),
+                                     generate_select_card(),
+
+
                                  ]),
 
                             generate_message_card(),
@@ -51,7 +52,7 @@ guest_layout = html.Div(
                      html.Div(
                          id='left-card',
                          children=[
-                             dcc.Store(id='store-map-csv'),
+                             dcc.Store(id='store-sensors-info'),
                              html.Div(
                                  id='top-card', children=[
                                      generate_select_card(),

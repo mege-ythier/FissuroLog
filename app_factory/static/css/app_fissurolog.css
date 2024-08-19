@@ -5,16 +5,17 @@ body, h1, h2, h3, h4, h5,p.DateInput_input {
     margin: 0;
     padding: 0;
     font-family:  Calibri;
-    font-weight: 2000
+    /* font-weight: 2000 */
 }
 /* supprimé car reduit la taille de l'image*/
-body{
+/* body{
+
     font-size: 1em
-}
+} */
 
 
 h1 {
-    font-size:3em;
+    font-size:1.8em;
     font-family: Montserrat, serif;
     font-weight: 3000
 }
@@ -31,7 +32,14 @@ h2 {color : rgb(255, 255, 255);
 
  h3{
     color : rgb(10, 0, 130);
-    background-color: greenyellow}
+    background-color: #e5dae4}
+
+
+h4{
+    font-size: 20px;
+    color : rgb(10, 0, 130);
+    background-color: #e8b8df}
+
 
 h5 {
     margin-left: 0px;
@@ -65,7 +73,7 @@ textarea {
 #app-card {
     background-image:url('mur_brique.jpg') ;
     background-size: cover;
-    height: 950px;
+    height: 1000px;
     padding:10px;
     display: block;
     margin: 0px 0px 0px 0px;
@@ -75,49 +83,52 @@ textarea {
 
 #header-card{
         background-color:rgb(243, 170, 227);
-        height: 70px; 
-        padding: 0px 5px;
+        height: 60px;
+        padding: 5px;
+        margin: 0px 0px 10px 0px
     }
 
 #main-card{
+    height: 910px;
     display: flex; 
     flex-direction: row;
     border: 5px solid rgb(248, 29, 237);
     font-size: 0.75em;
-    height: 85%;
  }
 
 
     #image-card{
         border: 5px solid rgb(235, 130, 45);
-        padding: 5px;
+        margin : 0 0 0 24px;
         width: 30%;
+      
+
     }
 
-        #upload-image1-dcc,#upload-image2-dcc{
+        #upload-image1-dcc{
             border: 5px solid rgb(16, 84, 230);
             height: 30%;
-            /* display: flex;
-            justify-content: center; */
+            margin: 0px 0 24px 0;
+
+        }
+        #upload-image2-dcc{
+            border: 5px solid rgb(194, 230, 16);
+            height: 65%;
+            
         }
 
             #upload-image1-dcc >div, #upload-image2-dcc >div {
                 color: rgb(255, 255, 255);
-                background-color: rgb(10, 0, 130);
-                height: 95%;
-                width : 100%;
-                padding: 5px;
-
+                height: 100%;
+                text-decoration: underline;
             }
 
                 #upload-image1-dcc >div >img, #upload-image2-dcc >div >img {
-                    color: rgb(255, 255, 255);
                     object-fit: contain;
                     object-position: 50% 50%;
                     border: 5px solid rgb(81, 215, 97);
                     height: inherit;
                     width: 100%;
-                    padding: 15px;
                 }
 
 
@@ -137,13 +148,12 @@ textarea {
             margin: 0px 0px 0px 0px;
             padding: 0px 0px 0px 0px;
             border: 5px solid rgb(235, 45, 54);
-            height: 50%;
- 
+            height: 48%;
         }
 
             #select-card {
                 width:  60em; 
-                margin :0em 1em 0em 1em ;
+                margin :0em 12px 0em 12px ;
                 border: 5px solid rgb(45, 226, 235);
                 background-color: rgb(155,210,200);
                 box-shadow: 10px 5px 5px rgba(32, 32, 33, 0.7);        
@@ -165,36 +175,51 @@ textarea {
                         /* box-shadow: 10px 5px 5px rgba(32, 32, 33, 0.7);     */
                     }
                     
-
-
-            #form-card {
+                #sensor-card {
                 border: 5px solid rgb(242, 29, 228);
                 background-color: rgb(155,210,200);
-                box-shadow: 10px 5px 5px rgba(32, 32, 33, 0.7);  
-                margin: 0px 0px 0px 1em;
-                display: flex;
-                flex-direction: row;
-                /* width: 30%; */
-
+                box-shadow: 10px 5px 5px rgba(32, 32, 33, 0.7);
+                margin: 0px 12px 0px 12px;
+                padding : 12px;
                 }
 
-                #form-card > div{
-                    border: 5px solid rgb(114, 242, 29);
-                    margin :1em 1em 1em 1em 
-                                }
-            
+                #title-sensor-card{
+                display: flex;
+                        flex-direction: row;
+                        background-color:rgb(0, 170, 145);
+                        padding: 10px 10px 10px 10px;
+                        margin: 10px;}
 
+
+                #form-card {
+                    display: flex;
+                    flex-direction: row;
+                    /* width: 30%; */
+
+                    }
+
+                    #form-card > div{
+                        border: 5px solid rgb(114, 242, 29);
+                        margin :0em 1em 0em 0em
+                                    }
+            
+            #owner-card {
+                border: 5px solid rgb(242, 199, 29);
+                margin: 0px 0px 0px 0px;
+                padding: 0px 0px 0px 0px;
+                display: flex;flex-direction: column;align-items: flex-start;
+                }                    
 
                 
             #button-card {
                 border: 5px solid rgb(242, 199, 29);
                 margin: 0px 0px 0px 0px;
                 padding: 0px 0px 0px 0px;
-                display: flex;flex-direction: column;align-items: flex-start;
+                display: flex;flex-direction: column;align-items: flex-start;gap:30px;
                 width: 5em;
                 }
 
-                #button-ingest, #button-delete-table, #button-update-metadata,#button_update_fig {
+                #button-ingest, #button-delete-table, #button-update-sensors-info,#button-update-fig {
                     border: 20px;       /* Suppression de la bordure */
                     padding:0px;
                     /* margin:  0px 0px 0px 0px; */
@@ -208,7 +233,7 @@ textarea {
                 }
 
 
-                #button-ingest::after, #button-delete-table::before, #button-update-metadata::before{
+                #button-ingest::after, #button-delete-table::before, #button-update-sensors-info:before{
                     font-family: 'webdings', sans-serif; 
                     color: white;
                     font-size: 3.5em;
@@ -216,7 +241,7 @@ textarea {
                     padding: 5px;
                 }
 
-                #button_update_fig::before {
+                #button-update-fig::before {
                     font-family: 'webdings', sans-serif;
                     color: white;
                     font-size: 2em;
@@ -235,21 +260,46 @@ textarea {
                     background-color: darkorchid;
                 }
 
-                #button-update-metadata::before {
+                #button-update-sensors-info::before {
                     content: '\1F5D8';
                     background-color: rgba(237, 244, 21, 0.78);
 
                 }
 
-                #button_update_fig::before {
+                #button-update-fig::before {
                     content: '\1F4E5';
                     background-color: rgba(244, 244, 21, 0.78);
 
+        }
+            #upload-file-card {margin: 0px 0px 0px 0px;}
+            
+                #upload-file-widget{
+                    border: 5px solid rgb(7, 11, 241);
+                    display: flex;flex-direction: row;
+                    margin: 0px 0px 0px 0px;
+                    padding: 0px 0px 0px 0px;
                 }
+                
+                    
+                    #upload-file-dcc {width: 6em}
+                    #upload-file-inner-card {margin-bottom: 40px;}
+                    
+                    
+                    #upload-file-dcc > div {
+                        font-size: 0.8em;
+                        font-family:  Arial;
+                        color: rgb(255, 255, 255);
+                        background-color: rgb(10, 0, 130);
+                        border-Width: 1px;
+                        border-Style: dashed;
+                        text-Align: center;
+                        margin: 15px 0px 0px 0px;
+                        padding: 5px
+                    }
+            
 
     #message-card {
         border: 5px solid rgb(29, 210, 242);
-        /*width: 30%;*/
         margin: 10px;
         padding: 0px 0px 0px 0px;
         }
@@ -259,36 +309,5 @@ textarea {
         width: 100%;
     }
 
- 
-#upload-file-card {
-    border: 5px solid rgb(7, 11, 241);
-    display: flex;flex-direction: row;
-    margin: 0px 0px 0px 0px;
-    padding: 0px 10px 0px 0px;
-}
 
-
-#upload-file-dcc {width: 6em}
-
-
-#upload-file-dcc > div {
-    font-size: 0.8em;
-    font-family:  Arial;
-    color: rgb(255, 255, 255);
-    background-color: rgb(10, 0, 130);
-    border-Width: 1px;
-    border-Style: dashed;
-    text-Align: center;
-    margin: 10px 0px 0px 0px;
-    padding: 5px
-}
-
-
-
-
-
-
-
-
-
-/* * {border: green !important;} */
+* {border: green !important;}

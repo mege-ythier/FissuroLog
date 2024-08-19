@@ -32,20 +32,11 @@ fig0.update_layout(
 )
 
 
-
 def generate_options_card():
     return html.Div(
         id='options-card',
         children=[
 
-            html.H2("capteur"),
-            dcc.Textarea(
-                id='dropdown-table',
-                value='',
-                # multi=False,
-                style={'maxWidth': '50px'},
-                disabled=True
-            ),
             html.H2("période"),
             dcc.DatePickerRange(
                 display_format='D M Y',
@@ -64,26 +55,26 @@ def generate_options_card():
                 id='aggregate-choice',
                 labelStyle={'display': 'inline-block', 'marginTop': '5px'}
             ),
-            html.Button(id='button_update_fig', hidden=True, title='charger les mesures'),
+            html.Button(id='button-update-fig', hidden=True, title='charger les mesures'),
         ]
     )
 
 
 def generate_upload_card():
-    return html.Div(
-        children=[
-            html.Div(
-                id="upload-file-card",
-                children=[
-                    dcc.Upload(
-                        id='upload-file-dcc',
-                        children="Télécharger des mesures",
-                        multiple=False
-                    ),
-                    html.Div(id='upload-file-inner-card'),
-                    dcc.Store(id='store-data-uploaded')]),
-            html.Button(id='button-ingest', hidden=True, title='intégrer les mesures dans la database'),
-        ])
+    return html.Div(id="upload-file-card",
+                    children=[
+                        html.Div(id='upload-file-widget',
+                                 children=[
+                                     dcc.Upload(
+                                         id='upload-file-dcc',
+                                         children="Selectionner des mesures",
+                                         multiple=False
+                                     ),
+                                     html.Button(id='button-ingest', hidden=True,
+                                                 title='intégrer les mesures dans la database')]),
+                        html.Div(id='upload-file-inner-card'),
+                        dcc.Store(id='store-data-uploaded'),
+                    ])
 
 
 # boite de dialogue pour specifier le nom du capteur
@@ -183,14 +174,24 @@ right_column = html.Div([
         value='',
         rows=4,
     ),
-    dcc.Store(id="store-metadata-to-ingest", data={})
+    dcc.Store(id="store-sensors-info-to-ingest", data={})
 ])
 
 
 def generate_form_card():
-    return html.Div(id='form-card',
-                    hidden=False,
-                    children=[left_column, right_column])
+    return html.Div(id='sensor-card',
+                    children=[
+                        html.Div(id='title-sensor-card', children=[html.H2("capteur"),
+                            dcc.Textarea(
+                                id='dropdown-table',
+                                value='',
+                                # multi=False,
+                                style={'maxWidth': '50px'},
+                                disabled=True
+                            )]),
+                        html.Div(id='form-card',
+                                 hidden=False,
+                                 children=[left_column, right_column])])
 
 
 def generate_button_card():
@@ -200,7 +201,17 @@ def generate_button_card():
 
             html.Button(title='Supprimer le capteur',
                         id='button-delete-table', hidden=True, ),
-            html.Button(title='modifier les informations du capteur', id='button-update-metadata', hidden=True),
+            html.Button(title='modifier les informations du capteur', id='button-update-sensors-info', hidden=True),
+
+        ])
+
+
+def generate_owner_card():
+    return html.Div(
+        id="owner-card",
+        children=[
+            generate_upload_card(),
+            generate_button_card(),
 
         ])
 
@@ -216,109 +227,6 @@ def generate_message_card():
         ])
 
 
-def generate_form_card_test():
-    return html.Div(id='form-card',
-                    hidden=False,
-                    children=[
-                        html.Div(
-                            id='form-card-column-left', children=[
-                                html.H5("Réseau"),
-                                dcc.Dropdown(
-                                    options=pd.Series(["RER", "METRO", "TRAM"]),
-                                    id='dropdown-net',
-                                    value=[],
-                                    multi=True,
-                                    style={'minWidth': '100px'}
-                                ),
-
-                                html.H5("type de capteur"),
-                                dcc.Textarea(
-                                    id='textarea-model',
-                                    disabled=True,
-                                    value='',
-                                    rows=1
-                                ),
-                                html.H5("Date de la pose *"),
-                                dcc.Textarea(
-                                    id='textarea-date-pose',
-                                    value='01/01/2000',
-                                    rows=1
-                                ),
-                                html.H5("Ouverture à la pose"),
-                                dcc.Textarea(
-                                    id='textarea-delta',
-                                    value='',
-                                    rows=1
-                                ),
-
-                                html.H5("Latitude *"),
-                                dcc.Textarea(
-                                    id='textarea-lat',
-                                    value='48.86182447752475',
-                                    rows=1
-                                ),
-                                html.H5("localisation dans le réseau"),
-                                dcc.Textarea(
-                                    id='textarea-lieu',
-                                    value='',
-                                    title='Ici tu expliques comment accéder au capteur dans le reseau',
-                                    rows=5),
-
-                            ]),
-                        html.Div([
-                            html.H5("ligne"),
-                            dcc.Dropdown(
-                                options=all_lines,
-                                value=[],
-                                id='dropdown-line',
-                                multi=True,
-                                style={'minWidth': '100px'}
-                            ),
-                            html.H5("numero du capteur"),
-                            dcc.Textarea(
-                                id='textarea-num',
-                                value='',
-                                rows=1
-                            ),
-                            html.H5("Date de la dépose"),
-                            dcc.Textarea(
-                                id='textarea-date-depose',
-                                value='',
-                                rows=1
-                            ),
-                            html.H5("localisation dans l'ouvrage *"),
-                            dcc.Textarea(
-                                id='textarea-zone',
-                                value='voute',
-                                maxLength=20,
-                                title='exemple : voute, piedroit .....',
-                                rows=1
-                            ),
-                            html.H5("Longitude *"),
-                            dcc.Textarea(
-                                id='textarea-long',
-                                value='2.347008154377339',
-                                rows=1
-                            ),
-
-                            html.H5("pk"),
-                            dcc.Textarea(
-                                id='textarea-pk',
-                                value='',
-                                rows=1,
-                            ),
-
-                            html.H5("commentaires"),
-                            dcc.Textarea(
-                                id='textarea-divers',
-                                value='',
-                                rows=2,
-                            ),
-                        ]),
-                        dcc.Store(id="store-metadata-to-ingest", data={}),
-                    ])
-
-
 def generate_select_card():
     return html.Div(
         id='select-card',
@@ -326,7 +234,10 @@ def generate_select_card():
             generate_options_card(),
             dcc.Graph(id='map',
                       config={'displaylogo': False, 'doubleClickDelay': 1000},
-                      figure=create_map([], -1)
+                      figure=create_map([], -1),
+                      selectedData=None,
+                      clickData=None
+
                       )
         ])
 
