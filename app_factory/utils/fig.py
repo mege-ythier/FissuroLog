@@ -17,7 +17,7 @@ def create_time_series_fig(df, table_name, delta_mm):
 
     fig.add_trace(go.Scatter(y=df["mm"],
                              x=df.index,
-                             name="ouverture",
+                             name="ouverture brute",
                              yaxis="y1",
                              marker=dict(
                                  symbol='cross',
@@ -27,18 +27,17 @@ def create_time_series_fig(df, table_name, delta_mm):
                              )
                   )
 
-    delta_mm = 0 if delta_mm == "" else np.float64(delta_mm)
+    delta_mm = 0 if delta_mm == "" or pd.isna(delta_mm) else np.float64(delta_mm)
 
-    fig.add_trace(go.Scatter(y=df["mm"] - float(delta_mm),
+    fig.add_trace(go.Scatter(y=df["mm"] - delta_mm,
                              x=df.index,
-                             name="ouverture relative",
+                             name="ouverture",
                              yaxis="y1",
                              marker=dict(
                                  symbol='cross',
                                  size=3,
                                  color="green",
                                  opacity=0.7),
-                             visible=False,
                              )
                   )
 
@@ -253,7 +252,7 @@ def create_time_series_fig(df, table_name, delta_mm):
                 direction="down",
                 x=-0.1,
                 xanchor="left",
-                y=0.25,
+                y=0.1,
                 yanchor="top",
                 bgcolor="white"
 
@@ -261,11 +260,11 @@ def create_time_series_fig(df, table_name, delta_mm):
         ],
     )
 
-    fig.add_annotation(x=-0.1, y=0.32, xanchor='left', yanchor='top',
+    fig.add_annotation(x=-0.1, y=0.18, xanchor='left', yanchor='top',
                        xref='paper', yref='paper', showarrow=False, align='right',
-                       text="type de tracé")
+                       text="tracé")
 
-    fig.add_annotation(x=-0.1, y=0.64, xanchor='left', yanchor='top',
+    fig.add_annotation(x=-0.1, y=0.65, xanchor='left', yanchor='top',
                        xref='paper', yref='paper', showarrow=False, align='right',
                        text="zoom")
     return fig
@@ -299,6 +298,7 @@ def create_map(sensors_json: list[dict], sensor_index):
     else:
         sensors_df = pd.DataFrame(sensors_json)
         sensors_df["Route"] = sensors_df["Reseau"] + " " + sensors_df["Ligne"].astype(str)
+        sensors_df=sensors_df.fillna('')
         routes_displayed = (sensors_df["Route"]).unique()
         routes_drawn = []
         for feature in ratp_dict['features']:
@@ -332,6 +332,7 @@ def create_map(sensors_json: list[dict], sensor_index):
 
         # dessiner les capteurs
         for i in range(sensors_df.shape[0]):
+            # remplacer les valeurs vides
             sensor = sensors_df.iloc[i, :]
             fig.add_trace(
                 go.Scattermapbox(
@@ -433,7 +434,7 @@ def query_time_series_data_and_create_fig(db, sensor_id, start_date, end_date, a
 
     if size_on_memory <= 200000:
         fig = create_time_series_fig(df, sensor_id, delta)
-        fig_message = ("Un capteur est sélectionné. Ses mesures sont affichées sur le graphe."
+        fig_message = (f"Le capteur F{sensor_id} est sélectionné. Ses mesures sont affichées sur le graphe."
                        " Tu peux modifier les informations de ce capteur, ou y ajouter de nouvelles mesures")
 
     return fig, fig_message

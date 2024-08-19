@@ -1,4 +1,4 @@
-html,body{font-family:'Poppins',sans-serif}
+html,body{font-family:'Calibri',sans-serif}
 .welcome-template{color:white;background:#5eb9d7}
 .welcome-template .container{text-align:center;position:absolute;left:0;right:0;top:0;bottom:0;margin:auto;height:fit-content}
 .welcome-template .container h1{font-family:'agenda',sans-serif;font-weight:600;text-shadow:-1px 1px 0 #3e798d;line-height:1}

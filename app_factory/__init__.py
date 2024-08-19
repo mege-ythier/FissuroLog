@@ -15,25 +15,14 @@ from . import routes
 
 db = SQLAlchemy()
 login_manager = LoginManager()
-metadata = MetaData()
 
-
-# def dash_login_required(func):
-#     @wraps(func)
-#     def decorated_function(*args, **kwargs):
-#         if not current_user.is_authenticated:
-#             return redirect(url_for('auth.login'))
-#         return func(*args, **kwargs)
-#
-#     return decorated_function
+# Création d'un objet journal create logger
+logging.config.fileConfig('logging.conf', disable_existing_loggers=True)
+mylogger = logging.getLogger(__name__)
 
 
 def create_app():
     """Construct core Flask application."""
-
-    # Création d'un objet journal create logger
-    logging.config.fileConfig('logging.conf', disable_existing_loggers=True)
-    mylogger = logging.getLogger(__name__)
 
     mylogger.info("Démarrage de l'application")
 
@@ -48,14 +37,15 @@ def create_app():
 
     with app.app_context():
 
-        metadata.reflect(bind=db.engine)
         app.register_blueprint(bp)
 
         from . import auth
         app.register_blueprint(auth.bp, url_prefix='/auth')
         # Create Database
-        #db.drop_all()
+        # db.drop_all()
         db.create_all()
+        # add metadata from tables not in the model
+        db.metadata.reflect(bind=db.engine)
 
         dash_debug = app.config["DASH_DEBUG"]
         dash_auto_reload = app.config["DASH_AUTO_RELOAD"]

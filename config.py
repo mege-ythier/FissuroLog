@@ -17,7 +17,7 @@ class Config:
     #ENVIRONMENT = environ.get("ENVIRONMENT")
 
     # Flask Config
-    FLASK_ENV= environ.get("FLASK_ENV")
+    FLASK_ENV = environ.get("FLASK_ENV")
     FLASK_APP = "wsgi.py"
     DEBUG = True if environ.get("FLASK_DEBUG") == 'True' else False
     SECRET_KEY = environ.get("SECRET_KEY")
@@ -27,6 +27,7 @@ class Config:
     SQLALCHEMY_DATABASE_URI = environ.get("SQLALCHEMY_DATABASE_URI")
     SQLALCHEMY_ECHO = False
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ENGINE_OPTIONS = {'isolation_level': 'SERIALIZABLE'}
 
     # Static Assets
     STATIC_FOLDER = "static"
