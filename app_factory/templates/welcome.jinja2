@@ -14,12 +14,12 @@
 
     <a href="{{ url_for('main_blueprint.logout') }}">Log out</a>
 
-    {% if current_user.role =="guest" %}
-        <a href="{{ '/dash_fissurolog_guest/' }}">Visualiser les fissuromètres</a>
-    {% endif %}
+
+    <a href="{{ '/dash_fissurolog_guest/' }}">Visualiser les fissuromètres</a>
+
 
     {% if current_user.role =="owner" %}
-        <a href="{{ '/dash_fissurolog_owner/' }}">Visualiser et gérer les fissuromètres</a>
+        <a href="{{ '/dash_fissurolog_owner/' }}">Gérer les fissuromètres</a>
     {% endif %}
 
      {% if current_user.email == 'admin@ratp.fr' %}

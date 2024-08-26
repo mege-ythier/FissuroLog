@@ -1,6 +1,5 @@
 """Initialize Flask app_factory."""
-import logging
-import logging.config
+
 from functools import wraps
 from dash import Dash
 from flask import Flask, redirect, url_for, abort
@@ -8,17 +7,17 @@ from flask.helpers import get_root_path
 from flask_login import LoginManager, current_user
 from flask_sqlalchemy import SQLAlchemy
 from flask import Blueprint
-from sqlalchemy import text, MetaData
+
+# Création d'un objet journal create logger
+import logging.config
+logging.config.fileConfig('logging.conf', disable_existing_loggers=True)
+mylogger = logging.getLogger(__name__)
 
 bp = Blueprint('main_blueprint', __name__, static_folder='static', template_folder='template')
 from . import routes
 
 db = SQLAlchemy()
 login_manager = LoginManager()
-
-# Création d'un objet journal create logger
-logging.config.fileConfig('logging.conf', disable_existing_loggers=True)
-mylogger = logging.getLogger(__name__)
 
 
 def create_app():
@@ -58,7 +57,8 @@ def create_app():
             url_base_pathname='/dash_fissurolog_owner/',
             assets_folder=get_root_path(__name__) + '/static/',
             meta_tags=[meta_viewport],
-            serve_locally=True
+            serve_locally=True,
+            prevent_initial_callbacks=True
         )
         from app_factory.layout import owner_layout
         dash_app_fissurolog_owner.layout = owner_layout
@@ -77,7 +77,8 @@ def create_app():
             url_base_pathname='/dash_fissurolog_guest/',
             assets_folder=get_root_path(__name__) + '/static/',
             meta_tags=[meta_viewport],
-            serve_locally=True
+            serve_locally=True,
+            prevent_initial_callbacks=True
         )
 
         from app_factory.layout import guest_layout
@@ -92,7 +93,7 @@ def create_app():
             def decorated_view(*args, **kwargs):
                 if not current_user.is_authenticated:
                     return redirect(url_for('auth_blueprint.login'))
-                if current_user.role != role:
+                if current_user.role == 'guest' and current_user.role != role:
                     abort(403)
                 return funct(*args, **kwargs)
 

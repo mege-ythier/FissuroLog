@@ -14,6 +14,7 @@ from app_factory import login_manager, db
 from app_factory.models import User
 from .forms import LoginForm, SignupFormForAdmin, ChangePasswordForm, SignupForm
 from . import bp
+
 import logging.config
 logging.config.fileConfig('logging.conf', disable_existing_loggers=True)
 mylogger = logging.getLogger(__name__)
@@ -92,7 +93,7 @@ def signup_owner():
     if form.validate_on_submit():
         existing_user = User.query.filter_by(email=form.email.data).first()
         if existing_user is None:
-            user = User(email=form.email.data,role=form.role.data)
+            user = User(email=form.email.data, role=form.role.data)
             user.set_password(form.password.data)
             db.session.add(user)
             db.session.commit()  # Create new user

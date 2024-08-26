@@ -7,7 +7,7 @@ from sqlalchemy import text
 
 from app_factory import db
 from app_factory.utils.ingest import parse_file_and_update_ingest_card, save_old_sensors_info, save_new_sensors_info
-from app_factory.utils.fig import create_map, query_time_series_data_and_create_fig
+
 
 from app_factory.callbacks import register_owner_callbacks
 
@@ -69,8 +69,8 @@ def test_ingest_final_step():
             else:
                 sensors_json = save_new_sensors_info(db, sensors_json, new_sensor_dict)
 
-            fig, fig_message = query_time_series_data_and_create_fig(db, sensor_id, start_date, end_date, aggregate,
-                                                                     new_sensor_dict["Ouverture_pose"])
+            fig, fig_message = query_time_series_data_and_create_fig_card(db, sensor_id, start_date, end_date, aggregate,
+                                                                          new_sensor_dict["Ouverture_pose"])
 
             selected_data = {'points': [{'customdata': [sensor_id]}]}
 

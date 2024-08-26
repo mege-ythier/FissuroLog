@@ -54,6 +54,7 @@ class SensorInfo(db.Model):
     Date_depose = db.Column(db.DateTime)
     Ouverture_pose = db.Column(db.Float)
     Divers = db.Column(db.String(1000))
+    Date_collecte = db.Column(db.DateTime)
 
     # Relation avec SensorImage
     Images = db.relationship('SensorImage', backref='sensor', lazy=True)

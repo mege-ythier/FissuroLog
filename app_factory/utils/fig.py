@@ -5,6 +5,18 @@ import pandas as pd
 import json
 from sqlalchemy import text
 
+fig0 = go.Figure()
+fig0.update_layout(
+    #autosize=True,
+    autosize=True,
+    height=10,
+    plot_bgcolor='rgba(0,0,0,0)',
+    paper_bgcolor='rgba(0,100,100,100)',
+    showlegend=False,  # Masquer la légende
+    xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, title=None),
+    yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, title=None),
+)
+
 
 def create_time_series_fig(df, table_name, delta_mm):
     title = f"capteur: {table_name}"
@@ -134,6 +146,7 @@ def create_time_series_fig(df, table_name, delta_mm):
 
     fig.update_layout(
         height=390,
+        autosize=True,
         margin={'l': 10, 'b': 10, 'r': 10, 't': 60},
         # plot_bgcolor='rgb(245, 250, 245)',
         plot_bgcolor='rgba(0,0,0,0)',
@@ -285,7 +298,7 @@ def create_map(sensors_json: list[dict], sensor_index):
         mapbox=dict(
             style='carto-positron',  # 'open-street-map',
             center={"lat": 48.8566, "lon": 2.3522},  # Centre de la carte
-            zoom=10,  # Niveau de zoom
+            zoom=11.5,  # Niveau de zoom
         ),
         legend_itemdoubleclick="toggleothers",
         legend_itemclick="toggle",
@@ -298,7 +311,7 @@ def create_map(sensors_json: list[dict], sensor_index):
     else:
         sensors_df = pd.DataFrame(sensors_json)
         sensors_df["Route"] = sensors_df["Reseau"] + " " + sensors_df["Ligne"].astype(str)
-        sensors_df=sensors_df.fillna('')
+        sensors_df = sensors_df.fillna('')
         routes_displayed = (sensors_df["Route"]).unique()
         routes_drawn = []
         for feature in ratp_dict['features']:
@@ -344,11 +357,16 @@ def create_map(sensors_json: list[dict], sensor_index):
                     hoverlabel=dict(bgcolor="black", font=dict(color="white"), namelength=15),
                     customdata=[sensor],
                     hovertemplate='Fissuromètre <b>%{customdata[0]} </b><br><br>'
-                                  'Date de la pose: %{customdata[10]}<br>'
                                   'Modèle: %{customdata[2]}<br>'
-                                  'localisation :%{customdata[5]}<br>'
-                                  'pk:%{customdata[6]}<br>'
-                                  'Ouverture initiale: %{customdata[11]} mm<br>',
+                                  'Date de la pose: %{customdata[10]}<br>'
+                                  'Ouverture initiale: %{customdata[12]} mm<br>'
+                                  'Dernière collecte: %{customdata[14]} <br>'
+                                  'Struture:%{customdata[5]}<br>'
+                                  'pk:%{customdata[7]}<br>'
+                                  'Localisation:%{customdata[6]}<br>'
+
+
+                    ,
                     marker=dict(
                         size=10,
                         color='black',
@@ -378,13 +396,14 @@ def create_map(sensors_json: list[dict], sensor_index):
     return fig
 
 
-def query_time_series_data_and_create_fig(db, sensor_id, start_date, end_date, aggregate, delta):
 
+
+def query_time_series_data_and_create_fig(db, sensor_id, start_date, end_date, aggregate, delta):
     start_date_timestamp = datetime.strptime(start_date, "%Y-%m-%d").timestamp()
     end_date_timestamp = datetime.strptime(end_date, "%Y-%m-%d").timestamp()
     query = ""
 
-    if aggregate == "non":
+    if aggregate == "brute":
         query = text(f"""
         SELECT *
         FROM F{sensor_id}
@@ -396,7 +415,6 @@ def query_time_series_data_and_create_fig(db, sensor_id, start_date, end_date, a
 
     else:
         if db.engine.name == 'sqlite':
-
             query = text(f"""
                 SELECT  strftime('%Y-%m-%d %H:00:00', datetime(unix,'unixepoch')) AS Date, mm, celsius
                 FROM F{sensor_id}
@@ -405,7 +423,6 @@ def query_time_series_data_and_create_fig(db, sensor_id, start_date, end_date, a
                 ORDER BY Date
             """)
         if db.engine.name == 'mysql':
-
             query = text(
                 f"""
                 SELECT DATE_FORMAT(FROM_UNIXTIME(unix), '%Y-%m-%d %H:00:00') AS Date, AVG(mm) AS mm, AVG(celsius) AS celsius
@@ -434,8 +451,7 @@ def query_time_series_data_and_create_fig(db, sensor_id, start_date, end_date, a
 
     if size_on_memory <= 200000:
         fig = create_time_series_fig(df, sensor_id, delta)
-        fig_message = (f"Le capteur F{sensor_id} est sélectionné. Ses mesures sont affichées sur le graphe."
-                       " Tu peux modifier les informations de ce capteur, ou y ajouter de nouvelles mesures")
+        fig_message = f"Le capteur F{sensor_id} est sélectionné. Ses mesures sont affichées sur le graphe."
 
     return fig, fig_message
 

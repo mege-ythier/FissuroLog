@@ -6,7 +6,7 @@ from wtforms.validators import DataRequired, Email, EqualTo, Length, Optional, V
 
 
 class SignupFormForAdmin(FlaskForm):
-    """User Sign-up Form."""
+    """Admin Sign-up Form."""
 
     email = StringField(
         "Email",
