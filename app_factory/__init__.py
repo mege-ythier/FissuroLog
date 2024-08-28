@@ -41,10 +41,10 @@ def create_app():
         from . import auth
         app.register_blueprint(auth.bp, url_prefix='/auth')
         # Create Database
-        # db.drop_all()
+        #db.drop_all()
         db.create_all()
         # add metadata from tables not in the model
-        db.metadata.reflect(bind=db.engine)
+        #db.metadata.reflect(bind=db.engine)
 
         dash_debug = app.config["DASH_DEBUG"]
         dash_auto_reload = app.config["DASH_AUTO_RELOAD"]

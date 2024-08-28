@@ -7,7 +7,7 @@ from sqlalchemy import text
 
 fig0 = go.Figure()
 fig0.update_layout(
-    #autosize=True,
+    # autosize=True,
     autosize=True,
     height=10,
     plot_bgcolor='rgba(0,0,0,0)',
@@ -361,10 +361,9 @@ def create_map(sensors_json: list[dict], sensor_index):
                                   'Date de la pose: %{customdata[10]}<br>'
                                   'Ouverture initiale: %{customdata[12]} mm<br>'
                                   'Dernière collecte: %{customdata[14]} <br>'
-                                  'Struture:%{customdata[5]}<br>'
+                                  'Structure:%{customdata[5]}<br>'
                                   'pk:%{customdata[7]}<br>'
                                   'Localisation:%{customdata[6]}<br>'
-
 
                     ,
                     marker=dict(
@@ -395,63 +394,4 @@ def create_map(sensors_json: list[dict], sensor_index):
 
     return fig
 
-
-
-
-def query_time_series_data_and_create_fig(db, sensor_id, start_date, end_date, aggregate, delta):
-    start_date_timestamp = datetime.strptime(start_date, "%Y-%m-%d").timestamp()
-    end_date_timestamp = datetime.strptime(end_date, "%Y-%m-%d").timestamp()
-    query = ""
-
-    if aggregate == "brute":
-        query = text(f"""
-        SELECT *
-        FROM F{sensor_id}
-        WHERE  unix > {start_date_timestamp} and unix < {end_date_timestamp}
-        """)
-        df = pd.read_sql(query, con=db.engine)
-        df['Date'] = pd.to_datetime(df['unix'], unit='s')
-        df.drop('unix', axis=1)
-
-    else:
-        if db.engine.name == 'sqlite':
-            query = text(f"""
-                SELECT  strftime('%Y-%m-%d %H:00:00', datetime(unix,'unixepoch')) AS Date, mm, celsius
-                FROM F{sensor_id}
-                WHERE unix > {start_date_timestamp} and unix < {end_date_timestamp}
-                GROUP BY Date
-                ORDER BY Date
-            """)
-        if db.engine.name == 'mysql':
-            query = text(
-                f"""
-                SELECT DATE_FORMAT(FROM_UNIXTIME(unix), '%Y-%m-%d %H:00:00') AS Date, AVG(mm) AS mm, AVG(celsius) AS celsius
-                FROM F{sensor_id}
-                WHERE unix > {start_date_timestamp} and unix < {end_date_timestamp}
-                GROUP BY Date
-                ORDER BY Date
-            """)
-
-        df = pd.read_sql(query, con=db.engine)
-
-    df = df.set_index('Date')
-    size_on_memory = df.memory_usage(index=True, deep=False).sum()
-
-    fig_message = "données trop volumineuses pour être affichées, modifier les options"
-    fig = go.Figure()
-    fig.update_layout(
-        # autosize=True,
-        height=10,
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        showlegend=False,  # Masquer la légende
-        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, title=None),
-        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, title=None),
-    )
-
-    if size_on_memory <= 200000:
-        fig = create_time_series_fig(df, sensor_id, delta)
-        fig_message = f"Le capteur F{sensor_id} est sélectionné. Ses mesures sont affichées sur le graphe."
-
-    return fig, fig_message
 

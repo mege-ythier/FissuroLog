@@ -1,7 +1,7 @@
 from dash import html, dcc
 
 from app_factory.utils.card import generate_message_card, generate_select_card, generate_header, \
-    generate_image_card, generate_owner_card, generate_upload_card
+    generate_image_card, generate_owner_card
 
 
 # definition de la mise en page de l'application
@@ -21,10 +21,7 @@ owner_layout = html.Div(
                                  id='top-card', children=[
                                      generate_owner_card(),
                                      generate_select_card(),
-
                                  ]),
-
-
 
                             html.Div(id ='time-series-card', hidden=True),
                             dcc.ConfirmDialog(id='confirm-throw-ingestion'),
@@ -55,7 +52,6 @@ guest_layout = html.Div(
                                  id='top-card', children=[
                                      generate_select_card(),
                                  ]),
-
 
                             html.Div(id ='time-series-card', hidden=True),
 

@@ -54,13 +54,13 @@ def generate_options_card():
     )
 
 
-left_column = html.Div(
+left_column = html.Div(id='left_colum_form',
     children=[
         html.H5("Réseau"),
         dcc.Dropdown(
             options=pd.Series(["RER", "METRO", "TRAM"]),
             id='dropdown-net',
-            value=[],
+            value=['RER'],
             multi=True,
             style={'minWidth': '100px'}
         ),
@@ -106,12 +106,12 @@ left_column = html.Div(
 
     ])
 
-right_column = html.Div([
+right_column = html.Div(id='right_colum_form', children=[
 
     html.H5("ligne"),
     dcc.Dropdown(
         options=all_lines,
-        value=[],
+        value=['A'],
         id='dropdown-line',
         multi=True,
         style={'minWidth': '100px'}
@@ -162,7 +162,7 @@ right_column = html.Div([
 
 def generate_form_card():
     return html.Div(id='form-card',
-                    hidden=False,
+                    # hidden=False,
                     children=[left_column, right_column])
 
 
@@ -255,7 +255,7 @@ def generate_image_card():
                               dcc.Upload(id='upload-image3-dcc', multiple=False)])
 
 
-def query_time_series_data_and_create_fig_card(db, sensor_id, start_date, end_date, aggregate, delta):
+def query_time_series_and_create_fig_card(db, sensor_id, start_date, end_date, aggregate, delta):
     start_date_timestamp = datetime.strptime(start_date, "%Y-%m-%d").timestamp()
     end_date_timestamp = datetime.strptime(end_date, "%Y-%m-%d").timestamp()
     query = ""
@@ -294,22 +294,23 @@ def query_time_series_data_and_create_fig_card(db, sensor_id, start_date, end_da
     df = df.set_index('Date')
     size_on_memory = df.memory_usage(index=True, deep=False).sum()
 
-    fig_message = "Données trop volumineuses pour être affichées 😢, modifier les options 🖊️"
+    fig_message = "Données trop volumineuses pour être affichées 😢.  Modifies les options 🖊️."
     children = []
 
     if size_on_memory <= 200000:
         fig = create_time_series_fig(df, sensor_id, delta)
         children = [dcc.Graph(id='time-series', figure=fig, config={'displaylogo': False})]
 
-        fig_message = [f"Le capteur F{sensor_id} est sélectionné 😎. Ses mesures sont affichées sur le graphe 👇 ."]
+        fig_message = [f"Le capteur F{sensor_id} est sélectionné 😎. Ses mesures sont affichées sur le graphe 👇."]
 
         if current_user.role == "owner":
-            fig_message = fig_message + ["Tu peux ajouter de nouvelles mesures à ce capteur, le supprimer, ou modifier ces caractéristiques 👈."]
+            fig_message = fig_message + [ "Tu peux ajouter de nouvelles mesures à ce capteur, le supprimer, "
+                                          "ou modifier ces caractéristiques 👈."]
 
     return children, fig_message
 
 
-def query_image_database_and_create_image_card(db, sensor_id, card_id, role):
+def query_images_and_create_image_card(db, sensor_id, card_id, role):
     try:
         query = f"""
                     SELECT data
@@ -326,5 +327,4 @@ def query_image_database_and_create_image_card(db, sensor_id, card_id, role):
             return html.H4("Click pour ajouter une image")
 
     else:
-        # a voir png, cherher le format
         return html.Img(src=f"data:image/png;base64,{image_encoded}")
