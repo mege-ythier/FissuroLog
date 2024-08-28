@@ -1,25 +1,26 @@
 import time
 import re
-
 import numpy as np
 from dash import html, Input, Output, State
 from dash.exceptions import PreventUpdate
 import pandas as pd
 
 from flask_login import current_user
-from sqlalchemy import text
+from sqlalchemy import text, Table, MetaData, Column, Float, Integer, inspect
 
-from app_factory.utils.ingest import parse_file_and_update_ingest_card, save_image_in_database, \
-    save_new_sensors_info, save_old_sensors_info
+from app_factory.utils.callback_function import parse_file_and_update_ingest_card
+from app_factory.utils.ingest import save_image, \
+    save_new_sensors_info, save_old_sensors_info, query_sensors_info_and_create_sensors_json
 from app_factory.utils.fig import create_map
-
-from app_factory.utils.card import query_time_series_data_and_create_fig_card, \
-    query_image_database_and_create_image_card
+from app_factory.utils.card import query_time_series_and_create_fig_card, \
+    query_images_and_create_image_card, left_column, right_column
 from app_factory import db
 
 import logging.config
+
 logging.config.fileConfig('logging.conf', disable_existing_loggers=True)
 mylogger = logging.getLogger(__name__)
+
 
 def register_callbacks(dash_app):
     @dash_app.callback(
@@ -28,20 +29,8 @@ def register_callbacks(dash_app):
         Input('url', 'pathname'))
     def welcome(url):
         if current_user.is_authenticated:
-            sensors_dtype = {'Id': str, 'Num': str, 'Modele': str, 'Reseau': str, 'Ligne': str, 'Zone': str,
-                             'Lieu': str, 'pk': np.float64, 'Latitude': np.float64, 'Longitude': np.float64,
-                             'Date_pose': 'datetime64[ns]', 'Date_depose': 'datetime64[ns]',
-                             'Ouverture_pose': np.float64, 'Date_collecte': 'datetime64[ns]'}
-
-            sensors_df = pd.read_sql('select * from sensors_info_tb', con=db.engine, dtype=sensors_dtype)
-            # les valeurs vides sont notées nan dans le dict, et apparaissent null dans le store
-            sensors_df["Date_pose"] = sensors_df['Date_pose'].dt.strftime('%d/%m/%Y')
-            sensors_df["Date_depose"] = sensors_df['Date_depose'].dt.strftime('%d/%m/%Y')
-            sensors_df["Date_collecte"] = sensors_df['Date_collecte'].dt.strftime('%d/%m/%Y')
-
             mylogger.info(f"{current_user.email} ouvre l'application")
-
-            return sensors_df.to_dict('records'), f'Bienvenue {current_user.email}'
+            return query_sensors_info_and_create_sensors_json(db), f'Bienvenue {current_user.email}'
         else:
 
             return [], "pas d'authentification"
@@ -54,7 +43,7 @@ def register_callbacks(dash_app):
         selected_point_index = -1
 
         if selected_data and 'points' in selected_data.keys() and selected_data['points'] != []:
-            # premier point selectionné,id est la premiere valeur
+
             selected_sensor_id = selected_data['points'][0]['customdata'][0]
             sensors_df = pd.DataFrame(sensors_json)
             if sensors_df.shape[0] > 0:
@@ -94,6 +83,7 @@ def register_callbacks(dash_app):
         Output('time-series-card', 'children', allow_duplicate=True),
         Output('fig-message', 'children', allow_duplicate=True),
         Output('image-message', 'children'),
+
         Input('button-update-fig', 'n_clicks'),
         Input('map', 'selectedData'),
         State('date-picker-select', "start_date"),
@@ -101,10 +91,11 @@ def register_callbacks(dash_app):
         State('aggregate-choice', 'value'),
         State('store-sensors-info', 'data'),
         State('image-card', 'hidden'))
-    def update_with_click_on_map(n_click, selected_data, start_date, end_date, aggregate, sensor_json, image_card_is_hidden):
+    def update_with_click_on_map(n_click, selected_data, start_date, end_date, aggregate, sensor_json,
+                                 image_card_is_hidden):
 
         fig_card_children = []
-        fig_message = "👋 Aucun capteur n'est sélectionné. Click sur la carte pour sélectionner un capteur existant ."
+        fig_message = "👋 Aucun capteur n'est sélectionné. Click sur la carte pour sélectionner un capteur."
         image_message = ""
         image1 = ""
         image2 = ""
@@ -114,21 +105,19 @@ def register_callbacks(dash_app):
             try:
                 sensor_id = selected_data['points'][0]['customdata'][
                     0]  # premier 0 car on prend seulement le premier point selectionné
-                if f"F{sensor_id}" not in db.metadata.tables.keys():
-                    raise ValueError(f"le capteur {sensor_id} n'a pas de table")
 
                 sensors_df = pd.DataFrame(sensor_json)
                 sensors_df = sensors_df.set_index("Id")
                 delta = sensors_df.loc[sensor_id, "Ouverture_pose"]
 
-                fig_card_children, fig_message = query_time_series_data_and_create_fig_card(db, sensor_id, start_date,
-                                                                                            end_date, aggregate,
-                                                                                            delta)
-                image1 = query_image_database_and_create_image_card(db, sensor_id, 1, current_user.role)
-                image2 = query_image_database_and_create_image_card(db, sensor_id, 2, current_user.role)
+                fig_card_children, fig_message = query_time_series_and_create_fig_card(db, sensor_id, start_date,
+                                                                                       end_date, aggregate,
+                                                                                       delta)
+                image1 = query_images_and_create_image_card(db, sensor_id, 1, current_user.role)
+                image2 = query_images_and_create_image_card(db, sensor_id, 2, current_user.role)
 
             except Exception as e:
-                fig_message = "💣 Oups! Essaies de recharger la page"
+                fig_message = "💣 Recharges la page web"
                 mylogger.error(f"{e}")
 
         if image_card_is_hidden:
@@ -178,9 +167,7 @@ def register_owner_callbacks(dash_app):
 
         else:
 
-            sensor_id = selected_data['points'][0]['customdata'][
-                0]  # premier 0 car on prend seulement le premier point selectionné
-
+            sensor_id = selected_data['points'][0]['customdata'][0]
             sensors_df = sensors_df.set_index("Id")
             model = sensors_df.loc[sensor_id, "Modele"]
             num = sensors_df.loc[sensor_id, "Num"]
@@ -201,7 +188,7 @@ def register_owner_callbacks(dash_app):
             if date_collecte is None: date_collecte = ""
             if pd.isna(pk) or pk is None: pk = ""
             if pd.isna(delta) or delta is None: delta = ""
-            # time.sleep(2)
+
 
         return (model, num, zone, place, str(pk), str(lat), str(long),
                 str(date_pose), str(date_depose), str(delta), divers, net, line, str(sensor_id), str(date_collecte)
@@ -231,19 +218,6 @@ def register_owner_callbacks(dash_app):
         else:
             return False, False
 
-    @dash_app.callback(
-        Output('upload-file-inner-card', 'children', allow_duplicate=True),
-        Output('button-ingest', 'hidden', allow_duplicate=True),
-        Input('store-data-uploaded', 'data'),
-        Input('store-sensors-info-to-ingest', 'data'))
-    def clear_upload_card(time_serie_data, sensor_data):
-        # if selected_data is None or (
-        #         selected_data and 'points' in selected_data.keys() and selected_data['points'] == []):
-        if len(time_serie_data) == 0 and len(sensor_data) == 0:
-            return "", True
-
-        else:
-            raise PreventUpdate
 
     @dash_app.callback(
         Output('store-data-uploaded', 'data'),
@@ -289,13 +263,12 @@ def register_owner_callbacks(dash_app):
 
         if sensor_dict_stored != {}:
             confirm_message_is_displayed = True
-            sensor_dict = sensor_dict_stored
             confirm_message = f"""
-                    retentative  
+                    🔥 Relance l'ingestion précedente.
                     click ok, pour lancer l'intégration.
-                    click annuler et rafraichis la page pour arrêter l'ingestion.
-                      
+                    click annuler puis rafraichis la page.
             """
+            sensor_dict = sensor_dict_stored
 
 
         elif any(len(value) == 0 for value in [net, line]):
@@ -303,9 +276,6 @@ def register_owner_callbacks(dash_app):
 
         elif any(value == "" for value in [zone, model, lat, long]):
             ingest_message = "⚠️ Des élements obligatoires ne sont pas renseignés dans le formulaire"
-
-        # elif not (re.compile(r'^[a-zA-Z\s]+$').match(zone)):
-        #     ingest_message = "Le nom de la zone est formé de lettres."
 
         elif not (re.compile(r'^-?\d*\.?\d*$').match(pk) or pk == ""):
             ingest_message = "⚠️ Le pk est un chiffre."
@@ -345,29 +315,29 @@ def register_owner_callbacks(dash_app):
                 sensor_id = selected_data['points'][0]['customdata'][0]
 
                 confirm_message = f"""
-                Les données de ton fichier vont étre intégrées au capteur existant F{sensor_id}.  
+                🏳️‍🌈 Ton fichier est associé à un capteur existant F{sensor_id}.  
                 click ok, pour lancer l'intégration.
         
-                click annuler, pour arrêter l'ingestion, puis choisis ou crée le bon capteur.      
+                click annuler, pour arrêter l'ingestion et changer de capteur.      
         """
 
             else:
                 confirm_message = f"""
-        Les données de ton fichier concernent un NOUVEAU capteur.
-        Vérifies bien que ton capteur n'existe sur la carte.     
+        🚨 Ton fichier concerne un NOUVEAU capteur.
+        Vérifies bien que ton capteur n'existe pas sur la carte.     
         Click OK pour lancer l'ingestion.
         """
 
-        sensor_dict = {'Id': sensor_id, 'Num': num, 'Modele': model,
-                       'Reseau': net[0] if type(net) == list else net,
-                       'Ligne': line[0] if type(line) == list else line,
-                       'Zone': zone, 'Lieu': lieu,
-                       'pk': None if pk == '' else float(pk),
-                       'Latitude': float(lat), 'Longitude': float(long),
-                       'Date_pose': date_pose, 'Date_depose': date_depose,
-                       'Ouverture_pose': None if delta == '' else float(delta),
-                       'Divers': divers,
-                       'Date_collecte': date_collecte}
+            sensor_dict = {'Id': sensor_id, 'Num': num, 'Modele': model,
+                           'Reseau': net[0] if type(net) == list else net,
+                           'Ligne': line[0] if type(line) == list else line,
+                           'Zone': zone, 'Lieu': lieu,
+                           'pk': None if pk == '' else float(pk),
+                           'Latitude': float(lat), 'Longitude': float(long),
+                           'Date_pose': date_pose, 'Date_depose': date_depose,
+                           'Ouverture_pose': None if delta == '' else float(delta),
+                           'Divers': divers,
+                           'Date_collecte': date_collecte}
 
         return confirm_message_is_displayed, confirm_message, sensor_dict, ingest_message
 
@@ -378,6 +348,9 @@ def register_owner_callbacks(dash_app):
         Output('map', 'selectedData'),
         Output('store-data-uploaded', 'data', allow_duplicate=True),
         Output('store-sensors-info-to-ingest', 'data', allow_duplicate=True),
+        Output('right_colum_form', 'hidden'),
+        Output('left_colum_form', 'hidden'),
+        Output('upload-file-inner-card', 'children', allow_duplicate=True),
         Input('confirm-throw-ingestion', 'submit_n_clicks'),
         State('store-data-uploaded', 'data'),
         State('store-sensors-info', 'data'),
@@ -385,78 +358,85 @@ def register_owner_callbacks(dash_app):
         State('date-picker-select', "start_date"),
         State('date-picker-select', "end_date"),
         State('aggregate-choice', 'value'),
-        State('map', 'selectedData'))
-    def ingest_final_step(click, data, sensors_json, new_sensor_dict, start_date, end_date, aggregate, selected_data):
-
+        State('map', 'selectedData'),
+        State('upload-file-inner-card','children'),
+    )
+    def ingest_final_step(click, data, sensors_json, new_sensor_dict, start_date, end_date, aggregate, selected_data,inner_card):
+        sensor_id = 1
         if selected_data and 'points' in selected_data.keys() and len(selected_data['points']) > 0:
             sensor_id = selected_data['points'][0]['customdata'][0]
         else:
 
-            sensors_id = [int(table.replace("F", "")) for table in list(db.metadata.tables.keys()) if
-                          table.startswith("F")]
-            sensor_id = max(sensors_id) + 1 if sensors_id else 1
-            # sensor_id=25
+            for attempt in range(5):
 
-            try:
+                try:
 
-                def create_table(sensor_name):
-                    class Measure(db.Model):
-                        __tablename__ = sensor_name
-                        unix = db.Column(db.Integer, primary_key=True)
-                        mm = db.Column(db.Float)
-                        celsius = db.Column(db.Float)
+                    tables = inspect(db.engine).get_table_names()
+                    sensors_id = [int(table.replace("F", "")) for table in tables if
+                                  table.startswith("F")]
+                    while sensor_id in sensors_id:
+                        sensor_id = sensor_id + 1
+                    mylogger.info(f"{current_user.email} lance la création du capteur f{sensor_id}")
 
-                    db.create_all()
+                    table = Table(
+                        f"F{sensor_id}",
+                        MetaData(),
+                        Column('unix', Integer, primary_key=True),
+                        Column('mm', Float),
+                        Column('celsius', Float))
+                    table.create(db.engine)
 
-                create_table(f"F{sensor_id}")
+                except Exception as e:
+                    mylogger.error(f"Echec {attempt + 1} de création de table: {e}")
+                    time.sleep(5)
+                else:
+                    mylogger.info(f"{current_user.email} crée le capteur f{sensor_id}")
 
-            except Exception as e:
 
-                sensors_dtype = {'Id': str, 'Num': str, 'Modele': str, 'Reseau': str, 'Ligne': str, 'Zone': str,
-                                 'Lieu': str, 'pk': np.float64, 'Latitude': np.float64, 'Longitude': np.float64,
-                                 'Date_pose': 'datetime64[ns]', 'Date_depose': 'datetime64[ns]',
-                                 'Ouverture_pose': np.float64, 'Date_collecte': 'datetime64[ns]'}
-                sensors_df = pd.read_sql('select * from sensors_info_tb', con=db.engine, dtype=sensors_dtype)
-
-                sensors_df["Date_pose"] = sensors_df['Date_pose'].dt.strftime('%d/%m/%Y')
-                sensors_df["Date_depose"] = sensors_df['Date_depose'].dt.strftime('%d/%m/%Y')
-                sensors_df["Date_collecte"] = sensors_df['Date_collecte'].dt.strftime('%d/%m/%Y')
-
-                mylogger.info(f"{current_user.email} échoue à créer le capteur f{sensor_id} avec l'erreur {e}")
-                database_info = "🔥 problème serveur .Réessaies dans quelques secondes "
-                return sensors_df.to_dict('records'), database_info, selected_data, data, new_sensor_dict
+            mylogger.info(f"Echec de la création du capteur")
+            database_info = "🔥🔥🔥  "
+            return query_sensors_info_and_create_sensors_json(
+                db), database_info, selected_data, data, new_sensor_dict, True, True, inner_card
 
         table_length_before = db.session.execute(text(f"SELECT COUNT(*) FROM F{sensor_id};")).scalar()
+
+        # integration des mesures
         df = pd.DataFrame(data)
         for index, row in df.iterrows():
             parameters = {'unix': row['unix'], 'mm': row['mm'], 'celsius': row['celsius']}
-
+            query = ""
             if db.engine.name == 'sqlite':
                 query = text(
                     f"INSERT OR IGNORE INTO F{sensor_id} (unix, mm, celsius) VALUES (:unix, :mm, :celsius)")
-            if db.engine.name == 'mysql':
+            elif db.engine.name == 'mysql':
                 query = text(f"INSERT IGNORE INTO F{sensor_id} (unix, mm, celsius) VALUES (:unix, :mm, :celsius)")
             db.session.execute(query, parameters)
-
         db.session.commit()
         table_length_after = db.session.execute(text(f"SELECT COUNT(*) FROM F{sensor_id};")).scalar()
         table_length = table_length_after - table_length_before
         database_info = (
             [f"✔️ Le capteur F{sensor_id} a intégré {table_length} mesures."])
 
+        # integration des informations du capteur
         new_sensor_dict["Id"] = sensor_id
         sensors_df = pd.DataFrame(data=sensors_json)
         if 'Id' in sensors_df.columns and sensor_id in sensors_df['Id'].values:
             sensors_json, message = save_old_sensors_info(db, sensors_json, new_sensor_dict)
             database_info = database_info + [message]
-            mylogger.info(f"{current_user.email} ajoute des données au fissuromètre {new_sensor_dict}")
+            mylogger.info(f"{current_user.email} ajoute des mesures au fissuromètre {new_sensor_dict}")
         else:
-            sensors_json = save_new_sensors_info(db, sensors_json, new_sensor_dict)
+            sensors_json, message = save_new_sensors_info(db, sensors_json, new_sensor_dict)
+            database_info = database_info + [message]
             mylogger.info(f"{current_user.email} crée le fissuromètre {new_sensor_dict}")
 
         selected_data = {'points': [{'customdata': [sensor_id]}]}
 
-        return sensors_json, database_info, selected_data, [], {}
+        return sensors_json, database_info, selected_data, [], {}, False, False ,""
+
+
+
+
+
 
     @dash_app.callback(
 
@@ -519,7 +499,7 @@ def register_owner_callbacks(dash_app):
         else:
             sensor_id = selected_data['points'][0]['customdata'][0]
 
-            confirm_message = f"Les données du capteur {sensor_id} vont être supprimées."
+            confirm_message = f" 💀 Les données du capteur {sensor_id} vont être supprimées."
             return True, confirm_message
 
     @dash_app.callback(
@@ -536,25 +516,32 @@ def register_owner_callbacks(dash_app):
 
         else:
             sensor_id = selected_data['points'][0]['customdata'][0]
+            mylogger.info(f"Debut de la suppression du capteur {sensor_id}")
             for attempt in range(5):
 
                 try:
-                    table_to_drop = db.metadata.tables[f"F{sensor_id}"]
-                    table_to_drop.drop(db.engine)
-                    db.metadata.remove(table_to_drop)
+                    db.session.execute(text(f" DELETE FROM sensors_image_tb WHERE sensor_id ='{sensor_id}'"))
+                    db.session.execute(text(f" DELETE FROM sensors_info_tb WHERE Id ='{sensor_id}'"))
 
                 except Exception as e:
-                    mylogger.error(f"Tentative {attempt + 1} de suppression le table du capteur échouée: {e}")
+                    mylogger.error(f"Echec {attempt + 1} de suppression de la ligne avec l'erreur: {e}")
                     time.sleep(2)
 
                 else:
 
                     try:
-                        db.session.execute(text(f" DELETE FROM sensors_image_tb WHERE sensor_id ='{sensor_id}'"))
-                        db.session.execute(text(f" DELETE FROM sensors_info_tb WHERE Id ='{sensor_id}'"))
+                        if db.engine.name == 'sqlite':
+                            db.session.commit()
+
+                        table_to_drop = Table(f"F{sensor_id}",
+                                              MetaData(),
+                                              Column('unix', Integer, primary_key=True),
+                                              Column('mm', Float),
+                                              Column('celsius', Float))
+                        table_to_drop.drop(db.engine)
 
                     except Exception as e:
-                        mylogger.error(f"Tentative {attempt + 1} de suppression du capteur échouée: {e}")
+                        mylogger.error(f"Echec {attempt + 1} de suppression de la table avec l'erreur : {e}")
 
                     else:
                         db.session.commit()
@@ -563,6 +550,7 @@ def register_owner_callbacks(dash_app):
                         sensor_dict = sensors_df.loc[sensor_id, :].to_dict()
                         sensors_df.drop(sensor_id, inplace=True, axis=0)
                         sensors_df.reset_index(inplace=True)
+                        sensor_dict["Id"] = sensor_id
                         mylogger.info(f"{current_user.email} supprime le fissuromètre {sensor_dict}")
                         ingest_message = f'capteur {sensor_id} supprimé 👌'
 
@@ -580,7 +568,7 @@ def register_owner_callbacks(dash_app):
     )
     def ingest_image1(image_contents, image_name, selected_data):
 
-        upload_info = save_image_in_database(
+        upload_info = save_image(
             db=db,
             selected_data=selected_data,
             image_content=image_contents,
@@ -588,7 +576,6 @@ def register_owner_callbacks(dash_app):
             card_id=1)
 
         return upload_info, html.Img(src=image_contents, width='100%')
-
 
     @dash_app.callback(
         Output('image-message', 'children', allow_duplicate=True),
@@ -599,7 +586,7 @@ def register_owner_callbacks(dash_app):
     )
     def ingest_image2(image_contents, image_name, selected_data):
 
-        upload_info = save_image_in_database(
+        upload_info = save_image(
             db=db,
             selected_data=selected_data,
             image_content=image_contents,

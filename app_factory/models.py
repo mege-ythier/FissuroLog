@@ -46,14 +46,14 @@ class SensorInfo(db.Model):
     Reseau = db.Column(db.String(5))
     Ligne = db.Column(db.String(4))
     Zone = db.Column(db.String(20))
-    Lieu = db.Column(db.String(20))
+    Lieu = db.Column(db.String(130))
     pk = db.Column(db.Float)
     Latitude = db.Column(db.Float)
     Longitude = db.Column(db.Float)
     Date_pose = db.Column(db.DateTime, nullable=False)
     Date_depose = db.Column(db.DateTime)
     Ouverture_pose = db.Column(db.Float)
-    Divers = db.Column(db.String(1000))
+    Divers = db.Column(db.String(200))
     Date_collecte = db.Column(db.DateTime)
 
     # Relation avec SensorImage
