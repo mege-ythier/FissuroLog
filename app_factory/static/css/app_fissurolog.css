@@ -173,6 +173,7 @@ textarea {line-height: 0.9em; /*background-color: rgb(192, 255, 208);*/}
             box-shadow: 10px 5px 5px rgba(32, 32, 33, 0.7);
             padding : 12px;
             min-height: 200px;
+            width: 30%;
             display: flex; 
             flex-direction: column;
             }

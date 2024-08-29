@@ -1,19 +1,12 @@
 
 import base64
 import io
-import time
 import numpy as np
 import pandas as pd
 from dash.dash_table import DataTable
 from dash.exceptions import PreventUpdate
 
 import logging.config
-
-from flask_login import current_user
-from sqlalchemy import text, Table, MetaData, Column, Float, Integer, inspect
-
-from app_factory import db
-from app_factory.utils.ingest import save_measures, query_sensors_info_and_create_sensors_json, save_old_sensors_info
 
 logging.config.fileConfig('logging.conf', disable_existing_loggers=True)
 mylogger = logging.getLogger(__name__)
