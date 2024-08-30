@@ -24,8 +24,7 @@ for feature in ratp_dict['features']:
     all_lines.append(line)
 
 
-def generate_options_card():
-    return html.Div(
+options_card = html.Div(
         id='options-card',
         children=[
 
@@ -160,14 +159,12 @@ right_column = html.Div(id='right_colum_form', children=[
 ])
 
 
-def generate_form_card():
-    return html.Div(id='form-card',
+form_card = html.Div(id='form-card',
                     # hidden=False,
                     children=[left_column, right_column])
 
 
-def generate_upload_card():
-    return html.Div(id="upload-file-card",
+upload_card = html.Div(id="upload-file-card",
                     children=[
 
                         html.Div(id='upload-file-inner-card'),
@@ -175,8 +172,7 @@ def generate_upload_card():
                     ])
 
 
-def generate_button_card():
-    return html.Div(id='button-card',
+button_card = html.Div(id='button-card',
                     children=[
 
                         html.Button(id='button-ingest', hidden=True,
@@ -187,8 +183,7 @@ def generate_button_card():
                     ])
 
 
-def generate_owner_card():
-    return html.Div(id='owner-card', children=[
+owner_card =  html.Div(id='owner-card', children=[
         html.Div(id='title-form-card', children=[
             html.Div(className='options_card_children', children=[
                 html.H2("capteur"),
@@ -205,15 +200,14 @@ def generate_owner_card():
                 multiple=False
             ),
         ]),
-        generate_form_card(),
-        generate_button_card(),
-        generate_upload_card(),
+        form_card,
+        button_card,
+        upload_card,
 
     ])
 
 
-def generate_message_card():
-    return html.Div(
+message_card = html.Div(
         id="message-card",
         children=[
             html.H3(id='fig-message',
@@ -224,11 +218,10 @@ def generate_message_card():
         ])
 
 
-def generate_select_card():
-    return html.Div(
+select_card = html.Div(
         id='select-card',
         children=[
-            generate_options_card(),
+            options_card,
             dcc.Graph(id='map',
                       config={'displaylogo': False, 'doubleClickDelay': 1000},
                       figure=create_map([], -1),
@@ -236,11 +229,11 @@ def generate_select_card():
                       clickData=None
 
                       )
+
         ])
 
 
-def generate_header():
-    return html.Div(
+header = html.Div(
         id='header-card',
         children=[html.Img(src='/static/img/logo_ratp_infra_pour_dash.png', width='15%', style={'float': 'right'}),
                   html.H1(id='welcome-info'),
@@ -248,8 +241,7 @@ def generate_header():
                   dcc.Location(id='url', refresh=False)])
 
 
-def generate_image_card():
-    return html.Div(id='image-card', hidden=True,
+image_card = html.Div(id='image-card', hidden=True,
                     children=[dcc.Upload(id='upload-image1-dcc', multiple=False),
                               dcc.Upload(id='upload-image2-dcc', multiple=False),
                               dcc.Upload(id='upload-image3-dcc', multiple=False)])

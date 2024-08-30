@@ -1,35 +1,29 @@
 from dash import html, dcc
 
-from app_factory.utils.card import generate_message_card, generate_select_card, generate_header, \
-    generate_image_card, generate_owner_card
+from app_factory.utils.card import message_card, select_card, header, image_card, owner_card
 
 
 # definition de la mise en page de l'application
 owner_layout = html.Div(
     id="app-card",
     children=[
-        generate_header(),
+        header,
         html.Div(id='main-card',
                  children=[
 
                      html.Div(
                          id="left-card",
                          children=[
-                             dcc.Store(id='store-sensors-info'),
-                            generate_message_card(),
-                             html.Div(
-                                 id='top-card', children=[
-                                     generate_owner_card(),
-                                     generate_select_card(),
-                                 ]),
-
-                            html.Div(id ='time-series-card', hidden=True),
+                            dcc.Store(id='store-sensors-info'),
+                            message_card,
+                            html.Div(id='top-card', children=[owner_card, select_card]),
+                            html.Div(id='time-series-card', hidden=True),
                             dcc.ConfirmDialog(id='confirm-throw-ingestion'),
                             dcc.ConfirmDialog(id='confirm-read-message'),
                             dcc.ConfirmDialog(id='confirm-delete-table'),
                          ]
                      ),
-                     generate_image_card()
+                     image_card
                  ]),
 
     ]
@@ -39,24 +33,20 @@ owner_layout = html.Div(
 guest_layout = html.Div(
     id="app-card",
     children=[
-        generate_header(),
+        header,
         html.Div(id='main-card',
                  children=[
 
                      html.Div(
                          id='left-card',
                          children=[
-                             dcc.Store(id='store-sensors-info'),
-                             generate_message_card(),
-                             html.Div(
-                                 id='top-card', children=[
-                                     generate_select_card(),
-                                 ]),
-
-                            html.Div(id ='time-series-card', hidden=True),
+                            dcc.Store(id='store-sensors-info'),
+                            message_card,
+                            html.Div(id='top-card', children=[select_card]),
+                            html.Div(id='time-series-card', hidden=True),
 
                          ]),
-                     generate_image_card()
+                     image_card
                  ]),
 
     ])

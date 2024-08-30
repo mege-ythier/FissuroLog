@@ -1,4 +1,3 @@
-
 import base64
 import io
 import numpy as np
@@ -13,7 +12,6 @@ mylogger = logging.getLogger(__name__)
 
 
 def parse_file_and_update_ingest_card(contents, filename):
-
     if contents is None:
         raise PreventUpdate
 
@@ -83,13 +81,13 @@ def parse_file_and_update_ingest_card(contents, filename):
                         raise ValueError("Les entêtes des colonnes du fichier sont incorrectes")
 
         except Exception as e:
-            mylogger.warning(f"Erreur dans le parsing : {e}")
+            mylogger.error(f"Erreur dans le parsing : {e}")
             return (
                 {},  # store-data-uploaded'
                 "",  # upload-card-inner
                 True,  # button-ingest-hidden
                 "",  # textarea-model
-                "❌ As tu bien bien téléchargé un fichier de mesures brutes ?", # ingest-message,
+                "❌ As tu bien bien téléchargé les mesures d'un fissuromètre 1D SITES ou GINGER ?",  # ingest-message,
                 False
             )
 
