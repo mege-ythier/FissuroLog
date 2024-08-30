@@ -386,7 +386,7 @@ def register_owner_callbacks(dash_app):
                 sensors_json, message = save_old_sensors_info(db, sensors_json, new_sensor_dict)
                 database_info = database_info + [message]
 
-                return sensors_json, database_info, selected_data, [], {'ingest_final_step': 'old_sensor'}, ""
+                return sensors_json, database_info, selected_data, [], {}, ""
 
 
         else:
@@ -473,7 +473,7 @@ def register_owner_callbacks(dash_app):
                                 [f"✔️ Intégration de {table_length} mesures "])
                             selected_data = {'points': [{'customdata': [sensor_id]}]}
 
-                        return sensors_json, database_info, selected_data, [], {'ingest_final_step': 'new_sensor'}, ""
+                        return sensors_json, database_info, selected_data, [], {}, ""
 
             # database_info = "🔥🔥🔥 Echec de la création du capteur"
             sensors_json = query_sensors_info_and_create_sensors_json(db)
