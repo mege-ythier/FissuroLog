@@ -1,7 +1,7 @@
 import time
 import re
-import numpy as np
 from dash import html, Input, Output, State
+from dash.dash_table import DataTable
 from dash.exceptions import PreventUpdate
 import pandas as pd
 
@@ -9,12 +9,9 @@ from flask_login import current_user
 from sqlalchemy import text, Table, MetaData, Column, Float, Integer, inspect
 
 from app_factory.models import SensorInfo
-from app_factory.utils.callback_function import parse_file_and_update_ingest_card
-from app_factory.utils.ingest import save_image, \
-    save_new_sensors_info, save_old_sensors_info, query_sensors_info_and_create_sensors_json, save_measures
-from app_factory.utils.fig import create_map
-from app_factory.utils.card import query_time_series_and_create_fig_card, \
-    query_images_and_create_image_card
+from app_factory.utils.ingest import save_image, parse_file_and_update_ingest_card, save_new_sensors_info, \
+    save_old_sensors_info, query_sensors_info_and_create_sensors_json, save_measures
+from app_factory.utils.fig import create_map, query_time_series_and_create_fig_card, query_images_and_create_image_card
 from app_factory import db
 
 import logging.config
@@ -43,16 +40,21 @@ def register_callbacks(dash_app):
         State('map', 'selectedData'))
     def update_map(sensors_json, selected_data):
         selected_point_index = -1
+        selected_sensor_lat = 48.8566
+        selected_sensor_lon = 2.3522
 
-        if selected_data and 'points' in selected_data.keys() and selected_data['points'] != []:
+        if selected_data and 'points' in selected_data.keys() and len(selected_data['points']) > 0:
 
             selected_sensor_id = selected_data['points'][0]['customdata'][0]
+            selected_sensor_lat = selected_data['points'][0]['lat']
+            selected_sensor_lon = selected_data['points'][0]['lon']
+
             sensors_df = pd.DataFrame(sensors_json)
             if sensors_df.shape[0] > 0:
                 index = sensors_df.loc[sensors_df.Id == selected_sensor_id].index
                 selected_point_index = -1 if len(index) == 0 else index[0]
 
-        return create_map(sensors_json, selected_point_index)
+        return create_map(sensors_json, selected_point_index, selected_sensor_lat, selected_sensor_lon)
 
     @dash_app.callback(Output('button-update-fig', 'hidden'),
                        Output('fig-message', 'children', allow_duplicate=True),
@@ -85,7 +87,6 @@ def register_callbacks(dash_app):
         Output('time-series-card', 'children', allow_duplicate=True),
         Output('fig-message', 'children', allow_duplicate=True),
         Output('image-message', 'children'),
-
         Input('button-update-fig', 'n_clicks'),
         Input('map', 'selectedData'),
         State('date-picker-select', "start_date"),
@@ -144,10 +145,12 @@ def register_owner_callbacks(dash_app):
         Output('dropdown-line', "value"),
         Output('dropdown-table', "value"),
         Output('textarea-date-collecte', "value"),
+        Output('store-sensor-info-to-ingest', 'data', allow_duplicate=True),
         Input('map', 'selectedData'),
         State('store-sensors-info', 'data'),
+        State('store-sensor-info-to-ingest', 'data'),
         Input('map', 'clickData'))
-    def update_form_card(selected_data, data, click_data):
+    def update_form_card(selected_data, sensors, sensor_to_ingest, click_data):
 
         model, num, zone, pk, place = "", "", "", "", ""
         lat, long = "", "",
@@ -156,9 +159,24 @@ def register_owner_callbacks(dash_app):
         net, line = "", ""
         sensor_id = ""
 
-        sensors_df = pd.DataFrame(data)
+        if sensor_to_ingest != {}:
 
-        if selected_data is None or (
+            model = sensor_to_ingest["Modele"]
+            num = sensor_to_ingest["Num"]
+            zone = sensor_to_ingest["Zone"]
+            place = sensor_to_ingest["Lieu"]
+            lat = sensor_to_ingest["Latitude"]
+            long = sensor_to_ingest["Longitude"]
+            pk = sensor_to_ingest["pk"] if sensor_to_ingest["pk"] else ''
+            date_pose = sensor_to_ingest["Date_pose"]
+            date_depose = sensor_to_ingest["Date_depose"]
+            delta = sensor_to_ingest["Ouverture_pose"] if sensor_to_ingest["Ouverture_pose"] else ''
+            divers = sensor_to_ingest["Divers"]
+            net = sensor_to_ingest["Reseau"]
+            line = sensor_to_ingest["Ligne"]
+            date_collecte = sensor_to_ingest["Date_collecte"]
+
+        elif selected_data is None or (
                 selected_data and 'points' in selected_data.keys() and selected_data['points'] == []):
 
             if click_data and 'points' in click_data.keys() and type(
@@ -167,9 +185,11 @@ def register_owner_callbacks(dash_app):
                 net = route.split(" ")[0]
                 line = route.split(" ")[1]
 
+
         else:
 
             sensor_id = selected_data['points'][0]['customdata'][0]
+            sensors_df = pd.DataFrame(sensors)
             sensors_df = sensors_df.set_index("Id")
             model = sensors_df.loc[sensor_id, "Modele"]
             num = sensors_df.loc[sensor_id, "Num"]
@@ -193,7 +213,7 @@ def register_owner_callbacks(dash_app):
 
         return (model, num, zone, place, str(pk), str(lat), str(long),
                 str(date_pose), str(date_depose), str(delta), divers, net, line, str(sensor_id), str(date_collecte)
-                )
+                , {})
 
     @dash_app.callback(
         Output('dropdown-line', 'options'),
@@ -221,20 +241,39 @@ def register_owner_callbacks(dash_app):
 
     @dash_app.callback(
         Output('store-data-uploaded', 'data'),
-        Output('upload-file-inner-card', 'children', allow_duplicate=True),
-        Output('button-ingest', 'hidden'),
         Output('textarea-model', 'value', allow_duplicate=True),
         Output('ingest-message', 'children', allow_duplicate=True),
-        Output('time-series-card', 'hidden', allow_duplicate=True),
         Input('upload-file-dcc', 'contents'),
         State('upload-file-dcc', 'filename'))
     def ingest_first_step(contents, filename):
         return parse_file_and_update_ingest_card(contents, filename)
 
     @dash_app.callback(
+        Output('upload-file-inner-card', 'children', allow_duplicate=True),
+        Output('button-ingest', 'hidden'),
+        Output('time-series-card', 'hidden', allow_duplicate=True),
+        Input('store-data-uploaded', 'data')
+    )
+    def ingest_second_step(store):
+        df = pd.DataFrame(store)
+
+        if len(store) == 0:
+            mylogger.info(f"{current_user.email} vide le store-data-uploaded")
+            return "", True, False
+        else:
+            mylogger.info(f"{current_user.email} store {len(store)} lignes dans le store-data-uploaded, la première est {store[0]}")
+            return DataTable(
+                data=df.drop("unix", axis=1).to_dict('records'),
+                columns=[{'name': i, 'id': i} for i in df.drop("unix", axis=1).columns],
+                page_size=10
+            ), False, True
+
+
+
+    @dash_app.callback(
         Output('confirm-throw-ingestion', 'displayed'),
         Output('confirm-throw-ingestion', 'message'),
-        Output('store-sensors-info-to-ingest', 'data'),
+        Output('store-sensor-info-to-ingest', 'data'),
         Output('ingest-message', 'children', allow_duplicate=True),
         Input('button-ingest', 'n_clicks'),
         State('map', 'selectedData'),
@@ -251,27 +290,16 @@ def register_owner_callbacks(dash_app):
         State('textarea-date-depose', 'value'),
         State('textarea-delta', 'value'),
         State('textarea-divers', 'value'),
-        State('textarea-date-collecte', 'value'),
-        State('store-sensors-info-to-ingest', 'data'))
+        State('textarea-date-collecte', 'value'))
     def ingest_middle_step(click, selected_data, model, num, net, line, zone, lieu, pk, long, lat, date_pose,
-                           date_depose, delta, divers, date_collecte, sensor_dict_stored):
+                           date_depose, delta, divers, date_collecte):
         sensor_id = ""
         ingest_message = ""
         confirm_message_is_displayed = False
         confirm_message = ""
         sensor_dict = {}
 
-        if sensor_dict_stored != {}:
-            confirm_message_is_displayed = True
-            confirm_message = f"""
-                    🔥 Relance l'ingestion précedente.
-                    click ok, pour lancer l'intégration.
-                    click annuler puis rafraichis la page.
-            """
-            sensor_dict = sensor_dict_stored
-
-
-        elif any(len(value) == 0 for value in [net, line]):
+        if any(len(value) == 0 for value in [net, line]):
             ingest_message = "⚠️ La ligne ou le réseau ne sont pas renseignés"
 
         elif any(value == "" for value in [zone, model, lat, long]):
@@ -347,20 +375,17 @@ def register_owner_callbacks(dash_app):
         Output('ingest-message', 'children', allow_duplicate=True),
         Output('map', 'selectedData'),
         Output('store-data-uploaded', 'data', allow_duplicate=True),
-        Output('store-sensors-info-to-ingest', 'data', allow_duplicate=True),
-        Output('upload-file-inner-card', 'children', allow_duplicate=True),
+        Output('store-sensor-info-to-ingest', 'data', allow_duplicate=True),
         Input('confirm-throw-ingestion', 'submit_n_clicks'),
         State('store-data-uploaded', 'data'),
         State('store-sensors-info', 'data'),
-        State('store-sensors-info-to-ingest', 'data'),
+        State('store-sensor-info-to-ingest', 'data'),
         State('date-picker-select', "start_date"),
         State('date-picker-select', "end_date"),
         State('aggregate-choice', 'value'),
         State('map', 'selectedData'),
-        State('upload-file-inner-card', 'children'),
     )
-    def ingest_final_step(click, data, sensors_json, new_sensor_dict, start_date, end_date, aggregate, selected_data,
-                          inner_card):
+    def ingest_final_step(click, data, sensors_json, new_sensor_dict, start_date, end_date, aggregate, selected_data):
 
         database_info = [""]
         mylogger.info(f"{current_user.email} lance ingest_final_step")
@@ -374,8 +399,8 @@ def register_owner_callbacks(dash_app):
             except:
                 mylogger.error(f"{current_user.email} échoue l'intégration des mesures")
                 database_info = "❌❌❌ Les mesures n'ont pas été intégrées."
-                return query_sensors_info_and_create_sensors_json(
-                    db), database_info, selected_data, data, {}, inner_card
+                sensors_json = query_sensors_info_and_create_sensors_json(db)
+                return sensors_json, database_info, selected_data, data, {}
             else:
                 db.session.commit()
                 table_length_after = db.session.execute(text(f"SELECT COUNT(*) FROM F{sensor_id};")).scalar()
@@ -386,7 +411,7 @@ def register_owner_callbacks(dash_app):
                 sensors_json, message = save_old_sensors_info(db, sensors_json, new_sensor_dict)
                 database_info = database_info + [message]
 
-                return sensors_json, database_info, selected_data, [], {}, ""
+                return sensors_json, database_info, selected_data, [], {}
 
 
         else:
@@ -394,7 +419,6 @@ def register_owner_callbacks(dash_app):
             for attempt in range(5):
 
                 try:
-
                     sensors_id = [sensor_id[0] for sensor_id in db.session.query(SensorInfo.Id)]
 
                     tables = inspect(db.engine).get_table_names()
@@ -434,9 +458,10 @@ def register_owner_callbacks(dash_app):
                         table.create(db.engine)
 
 
+
                     except Exception as e:
                         mylogger.error(f"{current_user.email} échoue la création de la table: {e}")
-                        database_info = database_info + ["❌Table absente "]
+                        database_info = database_info + ["❌Aucune table"]
                         time.sleep(5)
                         try:
                             sensor = SensorInfo.query.get(sensor_id)
@@ -445,8 +470,8 @@ def register_owner_callbacks(dash_app):
                         except:
                             db.session.rollback()
                             mylogger.info(
-                                f"{current_user.email} echoue la suppression des information du capteur {sensor_id}")
-                            database_info = database_info + ["❌Informations erronée"]
+                                f"{current_user.email} échoue la suppression des information du capteur {sensor_id}")
+                            database_info = database_info + ["❌Informations persistantes"]
                         else:
                             mylogger.info(f"{current_user.email} supprime les informations du capteur {sensor_id}")
                             database_info = database_info + ["✔️Informations purgées "]
@@ -471,13 +496,15 @@ def register_owner_callbacks(dash_app):
                             mylogger.info(f"{current_user.email} intégre {table_length} mesures")
                             database_info = database_info + (
                                 [f"✔️ Intégration de {table_length} mesures "])
-                            selected_data = {'points': [{'customdata': [sensor_id]}]}
 
-                        return sensors_json, database_info, selected_data, [], {}, ""
+                            selected_data = {'points': [{'customdata': [sensor_id], 'lat': new_sensor_dict["Latitude"],
+                                                         'lon': new_sensor_dict["Longitude"]}]}
 
-            # database_info = "🔥🔥🔥 Echec de la création du capteur"
+                        return sensors_json, database_info, selected_data, [], {}
+
+            #database_info = "🔥🔥🔥 Echec de la création du capteur"
             sensors_json = query_sensors_info_and_create_sensors_json(db)
-            return sensors_json, database_info, selected_data, data, new_sensor_dict, inner_card
+            return sensors_json, database_info, selected_data, data, new_sensor_dict
 
     @dash_app.callback(
 

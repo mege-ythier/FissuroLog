@@ -1,8 +1,11 @@
+import base64
 from datetime import datetime
 import numpy as np
 import plotly.graph_objects as go
 import pandas as pd
 import json
+from dash import dcc, html
+from flask_login import current_user
 from sqlalchemy import text
 
 fig0 = go.Figure()
@@ -283,7 +286,7 @@ def create_time_series_fig(df, table_name, delta_mm):
     return fig
 
 
-def create_map(sensors_json: list[dict], sensor_index):
+def create_map(sensors_json: list[dict], sensor_index, lat , lon):
     with open("./data_ratp/traces-du-reseau-de-transport-ferre-ratp.geojson", "r") as lines:
         ratp_dict = json.load(lines)
     with open("./data_ratp/couleur-ratp-carte.json", 'r') as files:
@@ -297,7 +300,7 @@ def create_map(sensors_json: list[dict], sensor_index):
         paper_bgcolor='rgba(245, 250, 245,1)',
         mapbox=dict(
             style='carto-positron',  # 'open-street-map',
-            center={"lat": 48.8566, "lon": 2.3522},  # Centre de la carte
+            center={"lat":lat, "lon":lon},  # Centre de la carte
             zoom=11.5,  # Niveau de zoom
         ),
         legend_itemdoubleclick="toggleothers",
@@ -395,3 +398,76 @@ def create_map(sensors_json: list[dict], sensor_index):
     return fig
 
 
+def query_time_series_and_create_fig_card(db, sensor_id, start_date, end_date, aggregate, delta):
+    start_date_timestamp = datetime.strptime(start_date, "%Y-%m-%d").timestamp()
+    end_date_timestamp = datetime.strptime(end_date, "%Y-%m-%d").timestamp()
+    query = ""
+
+    if aggregate == "brute":
+        query = text(f"""
+        SELECT *
+        FROM F{sensor_id}
+        WHERE  unix > {start_date_timestamp} and unix < {end_date_timestamp}
+        """)
+        df = pd.read_sql(query, con=db.engine)
+        df['Date'] = pd.to_datetime(df['unix'], unit='s')
+        df.drop('unix', axis=1)
+
+    else:
+        if db.engine.name == 'sqlite':
+            query = text(f"""
+                SELECT  strftime('%Y-%m-%d %H:00:00', datetime(unix,'unixepoch')) AS Date, mm, celsius
+                FROM F{sensor_id}
+                WHERE unix > {start_date_timestamp} and unix < {end_date_timestamp}
+                GROUP BY Date
+                ORDER BY Date
+            """)
+        if db.engine.name == 'mysql':
+            query = text(
+                f"""
+                SELECT DATE_FORMAT(FROM_UNIXTIME(unix), '%Y-%m-%d %H:00:00') AS Date, AVG(mm) AS mm, AVG(celsius) AS celsius
+                FROM F{sensor_id}
+                WHERE unix > {start_date_timestamp} and unix < {end_date_timestamp}
+                GROUP BY Date
+                ORDER BY Date
+            """)
+
+        df = pd.read_sql(query, con=db.engine)
+
+    df = df.set_index('Date')
+    size_on_memory = df.memory_usage(index=True, deep=False).sum()
+
+    fig_message = "Données trop volumineuses pour être affichées 😢.  Modifies les options 🖊️."
+    children = []
+
+    if size_on_memory <= 200000:
+        fig = create_time_series_fig(df, sensor_id, delta)
+        children = [dcc.Graph(id='time-series', figure=fig, config={'displaylogo': False})]
+
+        fig_message = [f"Le capteur F{sensor_id} est sélectionné 😎. Ses mesures sont affichées sur le graphe 👇."]
+
+        if current_user.role == "owner":
+            fig_message = fig_message + ["Tu peux ajouter de nouvelles mesures à ce capteur, le supprimer, "
+                                         "ou modifier ces caractéristiques 👈."]
+
+    return children, fig_message
+
+
+def query_images_and_create_image_card(db, sensor_id, card_id, role):
+    try:
+        query = f"""
+                    SELECT data
+                    FROM sensors_image_tb
+                    WHERE sensor_id ='{sensor_id}' AND card_id={card_id}
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """
+        image_from_database = db.session.execute(text(query)).scalar()
+        image_encoded = base64.b64encode(image_from_database).decode('utf-8')
+
+    except:
+        if role == 'owner':
+            return html.H4("Click pour ajouter une image")
+
+    else:
+        return html.Img(src=f"data:image/png;base64,{image_encoded}")
