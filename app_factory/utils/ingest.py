@@ -100,23 +100,11 @@ def parse_file_and_update_ingest_card(contents, filename):
 
 
 def save_old_sensors_info(db, sensors_json, new_sensor_dict):
-    # le sensor mis a jour
 
-    # formatage du store des sensors
     sensors_df = pd.DataFrame(data=sensors_json)
-    for column in sensors_df.columns.drop(['Id', 'Latitude', 'Longitude']):
-        sensors_df[column] = sensors_df[column].astype(str)
-
-    sensors_df.replace('None', '', inplace=True)
-    sensors_df.replace('nan', '', inplace=True)
-
-    # formatage du dictionnaire du sensor
-
-    for key, value in new_sensor_dict.items():
-        new_sensor_dict[key] = '' if new_sensor_dict[key] is None else new_sensor_dict[key]
-
     sensors_df.set_index('Id', inplace=True)
     sensor_id = new_sensor_dict["Id"]
+    #calcul des différences
     old_sensor_dict = sensors_df.loc[sensor_id, :].to_dict()
     old_sensor_dict["Id"] = sensor_id
 
@@ -162,7 +150,7 @@ def save_new_sensors_info(db, sensors_json, new_sensor_dict):
         Date_depose=None if new_sensor_dict['Date_depose'] == '' else datetime.strptime(
             new_sensor_dict['Date_depose'], '%d/%m/%Y'),
         Num=new_sensor_dict["Num"],
-        pk=None if new_sensor_dict["pk"] == None else float(new_sensor_dict["pk"]),
+        pk=None if new_sensor_dict["pk"] == '' else float(new_sensor_dict["pk"]),
         Divers=new_sensor_dict["Divers"],
         Zone=new_sensor_dict["Zone"],
         Lieu=new_sensor_dict["Lieu"],
@@ -227,18 +215,19 @@ def save_image(db, selected_data, image_content, image_name, card_id):
 
 def query_sensors_info(db):
     sensors_dtype = {'Id': int, 'Num': str, 'Modele': str, 'Reseau': str, 'Ligne': str, 'Zone': str,
-                     'Lieu': str, 'pk': np.float64, 'Latitude': np.float64, 'Longitude': np.float64,
+                     'Lieu': str, 'pk': str, 'Latitude': np.float64, 'Longitude': np.float64,
                      'Date_pose': 'datetime64[ns]', 'Date_depose': 'datetime64[ns]',
                      'Ouverture_pose': str, 'Date_collecte': 'datetime64[ns]'}
 
     sensors_df = pd.read_sql('select * from sensors_info_tb', con=db.engine, dtype=sensors_dtype)
+
     sensors_df.replace('None', '', inplace=True)
     sensors_df.replace('nan', '', inplace=True)
 
-    # les valeurs vides sont notées nan dans le dict, et apparaissent null dans le store
     sensors_df['Date_pose'] = sensors_df['Date_pose'].dt.strftime('%d/%m/%Y')
-    sensors_df['Date_depose'] = sensors_df['Date_depose'].dt.strftime('%d/%m/%Y')
-    sensors_df['Date_collecte'] = sensors_df['Date_collecte'].dt.strftime('%d/%m/%Y')
+    sensors_df['Date_depose'] = sensors_df['Date_depose'].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else '')
+    sensors_df['Date_collecte'] = sensors_df['Date_collecte'].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else '')
+
     return sensors_df.to_dict('records')
 
 

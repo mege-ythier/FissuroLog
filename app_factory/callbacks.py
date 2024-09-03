@@ -168,7 +168,7 @@ def register_owner_callbacks(dash_app):
             place = sensor_to_ingest["Lieu"]
             lat = sensor_to_ingest["Latitude"]
             long = sensor_to_ingest["Longitude"]
-            pk = sensor_to_ingest["pk"] if sensor_to_ingest["pk"] else ''
+            pk = sensor_to_ingest["pk"]
             date_pose = sensor_to_ingest["Date_pose"]
             date_depose = sensor_to_ingest["Date_depose"]
             delta = sensor_to_ingest["Ouverture_pose"]
@@ -207,12 +207,8 @@ def register_owner_callbacks(dash_app):
             line = sensors_df.loc[sensor_id, "Ligne"]
             date_collecte = sensors_df.loc[sensor_id, "Date_collecte"]
 
-            if date_depose is None: date_depose = ""
-            if date_collecte is None: date_collecte = ""
-            if pd.isna(pk) or pk is None: pk = ""
-
-        return (model, num, zone, place, str(pk), str(lat), str(long),
-                str(date_pose), str(date_depose), delta, divers, net, line, str(sensor_id), str(date_collecte)
+        return (model, num, zone, place, pk, str(lat), str(long),
+                date_pose, date_depose, delta, divers, net, line, str(sensor_id), date_collecte
                 , {})
 
     @dash_app.callback(
@@ -359,7 +355,7 @@ def register_owner_callbacks(dash_app):
                            'Reseau': net[0] if type(net) == list else net,
                            'Ligne': line[0] if type(line) == list else line,
                            'Zone': zone, 'Lieu': lieu,
-                           'pk': None if pk == '' else float(pk),
+                           'pk': pk,
                            'Latitude': float(lat), 'Longitude': float(long),
                            'Date_pose': date_pose, 'Date_depose': date_depose,
                            'Ouverture_pose': delta,
@@ -411,10 +407,12 @@ def register_owner_callbacks(dash_app):
                 try:
                     sensors_json, message = save_old_sensors_info(db, sensors_json, new_sensor_dict)
                     db.session.commit()
+
                 except Exception as e:
-                    database_info = database_info + [f"❌Information non mis à jour"]
+
+                    database_info = database_info + [f"❌Information non mise à jour"]
                     mylogger.error(
-                        f"{current_user.email} echoue la mise à jour des informations du capteur {sensor_id} : {e}")
+                        f"{current_user.email} échoue la mise à jour des informations du capteur {sensor_id} : {e}")
                 else:
 
                     if message != {}:
@@ -426,9 +424,8 @@ def register_owner_callbacks(dash_app):
 
 
         else:
-
             for attempt in range(5):
-
+                time.sleep(attempt)
                 try:
                     sensors_id = [sensor_id[0] for sensor_id in db.session.query(SensorInfo.Id)]
 
@@ -459,7 +456,6 @@ def register_owner_callbacks(dash_app):
                     database_info = database_info + ["😍Informations sauvegardées "]
 
                     try:
-
                         table = Table(
                             f"F{sensor_id}",
                             MetaData(),
@@ -468,12 +464,10 @@ def register_owner_callbacks(dash_app):
                             Column('celsius', Float))
                         table.create(db.engine)
 
-
-
                     except Exception as e:
                         mylogger.error(f"{current_user.email} échoue la création de la table: {e}")
                         database_info = database_info + ["❌Aucune table"]
-                        time.sleep(5)
+
                         try:
                             sensor = SensorInfo.query.get(sensor_id)
                             db.session.delete(sensor)
@@ -492,6 +486,8 @@ def register_owner_callbacks(dash_app):
 
                         mylogger.info(f"{current_user.email} crée la table F{sensor_id}")
                         database_info = [f"✔️Création du capteur {sensor_id} "]
+                        selected_data = {'points': [{'customdata': [sensor_id], 'lat': new_sensor_dict["Latitude"],
+                                                     'lon': new_sensor_dict["Longitude"]}]}
 
                         try:
                             save_measures(db, data, sensor_id)
@@ -500,7 +496,8 @@ def register_owner_callbacks(dash_app):
                         except:
                             db.session.rollback()
                             mylogger.error(f"{current_user.email} échoue l'intégration des mesures")
-                            database_info = database_info + [" ❌Aucune mesure"]
+                            database_info = database_info + [" ❌Aucune mesure intégrée"]
+
 
                         else:
 
@@ -509,14 +506,10 @@ def register_owner_callbacks(dash_app):
                             database_info = database_info + (
                                 [f"✔️ Intégration de {table_length} mesures "])
 
-                            selected_data = {'points': [{'customdata': [sensor_id], 'lat': new_sensor_dict["Latitude"],
-                                                         'lon': new_sensor_dict["Longitude"]}]}
-
                         return sensors_json, database_info, selected_data, [], {}
 
             # database_info = "🔥🔥🔥 Echec de la création du capteur"
-            sensors_json = query_sensors_info(db)
-            return sensors_json, database_info, selected_data, data, new_sensor_dict
+            return query_sensors_info(db), database_info, selected_data, data, new_sensor_dict
 
     @dash_app.callback(
 
