@@ -10,7 +10,7 @@ from sqlalchemy import text, Table, MetaData, Column, Float, Integer, inspect
 
 from app_factory.models import SensorInfo
 from app_factory.utils.ingest import save_image, parse_file_and_update_ingest_card, save_new_sensors_info, \
-    save_old_sensors_info, query_sensors_info_and_create_sensors_json, save_measures
+    save_old_sensors_info, query_sensors_info, save_measures
 from app_factory.utils.fig import create_map, query_time_series_and_create_fig_card, query_images_and_create_image_card
 from app_factory import db
 
@@ -29,7 +29,7 @@ def register_callbacks(dash_app):
         if current_user.is_authenticated:
             mylogger.info(f"{current_user.email} ouvre l'application")
 
-            return query_sensors_info_and_create_sensors_json(db), f'Bienvenue {current_user.email}'
+            return query_sensors_info(db), f'Bienvenue {current_user.email}'
         else:
 
             return [], "pas d'authentification"
@@ -46,13 +46,14 @@ def register_callbacks(dash_app):
         if selected_data and 'points' in selected_data.keys() and len(selected_data['points']) > 0:
 
             selected_sensor_id = selected_data['points'][0]['customdata'][0]
-            selected_sensor_lat = selected_data['points'][0]['lat']
-            selected_sensor_lon = selected_data['points'][0]['lon']
-
             sensors_df = pd.DataFrame(sensors_json)
-            if sensors_df.shape[0] > 0:
+
+            if len(sensors_df.index) > 0:
                 index = sensors_df.loc[sensors_df.Id == selected_sensor_id].index
-                selected_point_index = -1 if len(index) == 0 else index[0]
+                if len(index) > 0:
+                    selected_point_index = index[0]
+                    selected_sensor_lat = sensors_df.iloc[selected_point_index]["Latitude"]
+                    selected_sensor_lon = sensors_df.iloc[selected_point_index]["Longitude"]
 
         return create_map(sensors_json, selected_point_index, selected_sensor_lat, selected_sensor_lon)
 
@@ -94,8 +95,8 @@ def register_callbacks(dash_app):
         State('aggregate-choice', 'value'),
         State('store-sensors-info', 'data'),
         State('image-card', 'hidden'))
-    def update_with_click_on_map(n_click, selected_data, start_date, end_date, aggregate, sensor_json,
-                                 image_card_is_hidden):
+    def update_with_select_on_map(n_click, selected_data, start_date, end_date, aggregate, sensor_json,
+                                  image_card_is_hidden):
 
         fig_card_children = []
         fig_message = "👋 Aucun capteur n'est sélectionné. Click sur la carte pour sélectionner un capteur."
@@ -108,9 +109,9 @@ def register_callbacks(dash_app):
             try:
                 sensor_id = selected_data['points'][0]['customdata'][
                     0]  # premier 0 car on prend seulement le premier point selectionné
-
                 sensors_df = pd.DataFrame(sensor_json)
-                sensors_df = sensors_df.set_index("Id")
+                sensors_df.set_index("Id", inplace=True)
+
                 delta = sensors_df.loc[sensor_id, "Ouverture_pose"]
 
                 fig_card_children, fig_message = query_time_series_and_create_fig_card(db, sensor_id, start_date,
@@ -170,7 +171,7 @@ def register_owner_callbacks(dash_app):
             pk = sensor_to_ingest["pk"] if sensor_to_ingest["pk"] else ''
             date_pose = sensor_to_ingest["Date_pose"]
             date_depose = sensor_to_ingest["Date_depose"]
-            delta = sensor_to_ingest["Ouverture_pose"] if sensor_to_ingest["Ouverture_pose"] else ''
+            delta = sensor_to_ingest["Ouverture_pose"]
             divers = sensor_to_ingest["Divers"]
             net = sensor_to_ingest["Reseau"]
             line = sensor_to_ingest["Ligne"]
@@ -209,10 +210,9 @@ def register_owner_callbacks(dash_app):
             if date_depose is None: date_depose = ""
             if date_collecte is None: date_collecte = ""
             if pd.isna(pk) or pk is None: pk = ""
-            if pd.isna(delta) or delta is None: delta = ""
 
         return (model, num, zone, place, str(pk), str(lat), str(long),
-                str(date_pose), str(date_depose), str(delta), divers, net, line, str(sensor_id), str(date_collecte)
+                str(date_pose), str(date_depose), delta, divers, net, line, str(sensor_id), str(date_collecte)
                 , {})
 
     @dash_app.callback(
@@ -261,14 +261,13 @@ def register_owner_callbacks(dash_app):
             mylogger.info(f"{current_user.email} vide le store-data-uploaded")
             return "", True, False
         else:
-            mylogger.info(f"{current_user.email} store {len(store)} lignes dans le store-data-uploaded, la première est {store[0]}")
+            mylogger.info(
+                f"{current_user.email} store {len(store)} lignes dans le store-data-uploaded, la première est {store[0]}")
             return DataTable(
                 data=df.drop("unix", axis=1).to_dict('records'),
                 columns=[{'name': i, 'id': i} for i in df.drop("unix", axis=1).columns],
                 page_size=10
             ), False, True
-
-
 
     @dash_app.callback(
         Output('confirm-throw-ingestion', 'displayed'),
@@ -363,7 +362,7 @@ def register_owner_callbacks(dash_app):
                            'pk': None if pk == '' else float(pk),
                            'Latitude': float(lat), 'Longitude': float(long),
                            'Date_pose': date_pose, 'Date_depose': date_depose,
-                           'Ouverture_pose': None if delta == '' else float(delta),
+                           'Ouverture_pose': delta,
                            'Divers': divers,
                            'Date_collecte': date_collecte}
 
@@ -396,20 +395,32 @@ def register_owner_callbacks(dash_app):
             try:
                 table_length_before = db.session.execute(text(f"SELECT COUNT(*) FROM F{sensor_id};")).scalar()
                 save_measures(db, data, sensor_id)
+
             except:
-                mylogger.error(f"{current_user.email} échoue l'intégration des mesures")
+                mylogger.error(f"{current_user.email} échoue l'intégration des mesures du capteur {sensor_id}")
                 database_info = "❌❌❌ Les mesures n'ont pas été intégrées."
-                sensors_json = query_sensors_info_and_create_sensors_json(db)
+                sensors_json = query_sensors_info(db)
                 return sensors_json, database_info, selected_data, data, {}
             else:
                 db.session.commit()
                 table_length_after = db.session.execute(text(f"SELECT COUNT(*) FROM F{sensor_id};")).scalar()
                 table_length = table_length_after - table_length_before
                 database_info = [f"✔️ Le capteur F{sensor_id} a intégré {table_length} mesures."]
-                mylogger.info(f"{current_user.email} ajoute des mesures au fissuromètre {new_sensor_dict}")
+                mylogger.info(f"{current_user.email} ajoute {table_length} mesures au fissuromètre {new_sensor_dict}")
                 new_sensor_dict["Id"] = sensor_id
-                sensors_json, message = save_old_sensors_info(db, sensors_json, new_sensor_dict)
-                database_info = database_info + [message]
+                try:
+                    sensors_json, message = save_old_sensors_info(db, sensors_json, new_sensor_dict)
+                    db.session.commit()
+                except Exception as e:
+                    database_info = database_info + [f"❌Information non mis à jour"]
+                    mylogger.error(
+                        f"{current_user.email} echoue la mise à jour des informations du capteur {sensor_id} : {e}")
+                else:
+
+                    if message != {}:
+                        mylogger.info(
+                            f"{current_user.email} met à jour les informations du capteur {sensor_id} suivantes: {message}")
+                        database_info = database_info + [f"😍Informations mises à jour."]
 
                 return sensors_json, database_info, selected_data, [], {}
 
@@ -430,7 +441,7 @@ def register_owner_callbacks(dash_app):
 
                     mylogger.info(
                         f"{current_user.email} tente de créer un nouveau capteur pour la {attempt + 1} ème fois")
-                    mylogger.info(f"{current_user.email} nomme le capteur {sensor_id} ")
+                    mylogger.info(f"{current_user.email} nomme le nouveau capteur {sensor_id} ")
 
                     new_sensor_dict["Id"] = sensor_id
 
@@ -470,10 +481,11 @@ def register_owner_callbacks(dash_app):
                         except:
                             db.session.rollback()
                             mylogger.info(
-                                f"{current_user.email} échoue la suppression des information du capteur {sensor_id}")
+                                f"{current_user.email} échoue la suppression des information du capteur sans table {sensor_id}")
                             database_info = database_info + ["❌Informations persistantes"]
                         else:
-                            mylogger.info(f"{current_user.email} supprime les informations du capteur {sensor_id}")
+                            mylogger.info(
+                                f"{current_user.email} supprime les informations du capteur sans table {sensor_id}")
                             database_info = database_info + ["✔️Informations purgées "]
 
                     else:
@@ -502,8 +514,8 @@ def register_owner_callbacks(dash_app):
 
                         return sensors_json, database_info, selected_data, [], {}
 
-            #database_info = "🔥🔥🔥 Echec de la création du capteur"
-            sensors_json = query_sensors_info_and_create_sensors_json(db)
+            # database_info = "🔥🔥🔥 Echec de la création du capteur"
+            sensors_json = query_sensors_info(db)
             return sensors_json, database_info, selected_data, data, new_sensor_dict
 
     @dash_app.callback(
@@ -542,7 +554,7 @@ def register_owner_callbacks(dash_app):
                               'Ligne': line[0] if type(line) == list else line,
                               'Zone': zone, 'Lieu': lieu,
                               'pk': pk,
-                              'Modele': model, 'Num': num, 'Latitude': lat, 'Longitude': long,
+                              'Modele': model, 'Num': num, 'Latitude': float(lat), 'Longitude': float(long),
                               'Date_pose': date_pose,
                               'Date_depose': date_depose,
                               'Ouverture_pose': delta,

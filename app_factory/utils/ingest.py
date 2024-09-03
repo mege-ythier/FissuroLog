@@ -13,6 +13,7 @@ import logging.config
 logging.config.fileConfig('logging.conf', disable_existing_loggers=True)
 mylogger = logging.getLogger(__name__)
 
+
 def parse_file_and_update_ingest_card(contents, filename):
     if contents is None:
         raise PreventUpdate
@@ -92,7 +93,7 @@ def parse_file_and_update_ingest_card(contents, filename):
 
         else:
             return (
-                df.drop("Date", axis=1).to_dict('records'),  # store-data-uploaded'
+                df.to_dict('records'),  # store-data-uploaded'
                 f"{provider}",  # textarea-sensor-model
                 f"Complètes la fiche du capteur 🖊️, puis lances l'intégration du fichier {filename}.",  # ingest-message
             )
@@ -101,19 +102,16 @@ def parse_file_and_update_ingest_card(contents, filename):
 def save_old_sensors_info(db, sensors_json, new_sensor_dict):
     # le sensor mis a jour
 
-    # modification du store
+    # formatage du store des sensors
     sensors_df = pd.DataFrame(data=sensors_json)
-
-    for column in sensors_df.columns:
+    for column in sensors_df.columns.drop(['Id', 'Latitude', 'Longitude']):
         sensors_df[column] = sensors_df[column].astype(str)
 
-    # attention les formats du dictionnaire est variables
     sensors_df.replace('None', '', inplace=True)
     sensors_df.replace('nan', '', inplace=True)
 
-    new_sensor_dict['Latitude'] = str(new_sensor_dict['Latitude'])
-    new_sensor_dict['Longitude'] = str(new_sensor_dict['Longitude'])
-    new_sensor_dict['Id'] = str(new_sensor_dict['Id'])
+    # formatage du dictionnaire du sensor
+
     for key, value in new_sensor_dict.items():
         new_sensor_dict[key] = '' if new_sensor_dict[key] is None else new_sensor_dict[key]
 
@@ -125,21 +123,16 @@ def save_old_sensors_info(db, sensors_json, new_sensor_dict):
     diff_sensor = {k: new_sensor_dict[k] for k in new_sensor_dict if
                    new_sensor_dict.get(k) != old_sensor_dict.get(k)}
 
-    sensors_df.loc[sensor_id, :] = pd.Series(new_sensor_dict)  # le format de la serie passe dans la df
+    # modification du sensor
+    sensors_df.loc[sensor_id, :] = pd.Series(
+        new_sensor_dict)  # attention :le format de la série passe dans la dataframe
     sensors_df.reset_index(inplace=True)
-
     sensors_json = sensors_df.to_dict("records")
 
-    # modification de la database
-
-    new_sensor_dict['Latitude'] = float(new_sensor_dict['Latitude'])
-    new_sensor_dict['Longitude'] = float(new_sensor_dict['Longitude'])
-
+    # formatage de la database
     new_sensor_dict['pk'] = None if new_sensor_dict['pk'] == '' else float(new_sensor_dict['pk'])
-
     new_sensor_dict['Ouverture_pose'] = None if new_sensor_dict['Ouverture_pose'] == '' else float(
         new_sensor_dict['Ouverture_pose'])
-
     new_sensor_dict['Date_pose'] = datetime.strptime(new_sensor_dict['Date_pose'], '%d/%m/%Y')
     new_sensor_dict['Date_depose'] = None if new_sensor_dict['Date_depose'] == '' else datetime.strptime(
         new_sensor_dict['Date_depose'], '%d/%m/%Y')
@@ -163,7 +156,7 @@ def save_new_sensors_info(db, sensors_json, new_sensor_dict):
         Modele=new_sensor_dict["Modele"],
         Latitude=float(new_sensor_dict["Latitude"]),
         Longitude=float(new_sensor_dict["Longitude"]),
-        Ouverture_pose=None if new_sensor_dict["Ouverture_pose"] == None else float(
+        Ouverture_pose=None if new_sensor_dict["Ouverture_pose"] == '' else float(
             new_sensor_dict["Ouverture_pose"]),
         Date_pose=datetime.strptime(new_sensor_dict['Date_pose'], '%d/%m/%Y'),
         Date_depose=None if new_sensor_dict['Date_depose'] == '' else datetime.strptime(
@@ -179,6 +172,7 @@ def save_new_sensors_info(db, sensors_json, new_sensor_dict):
     db.session.add(sensor)
 
     return sensors_json
+
 
 def save_image(db, selected_data, image_content, image_name, card_id):
     try:
@@ -231,22 +225,25 @@ def save_image(db, selected_data, image_content, image_name, card_id):
     return image_uploaded_info
 
 
-def query_sensors_info_and_create_sensors_json(db):
-    sensors_dtype = {'Id': str, 'Num': str, 'Modele': str, 'Reseau': str, 'Ligne': str, 'Zone': str,
+def query_sensors_info(db):
+    sensors_dtype = {'Id': int, 'Num': str, 'Modele': str, 'Reseau': str, 'Ligne': str, 'Zone': str,
                      'Lieu': str, 'pk': np.float64, 'Latitude': np.float64, 'Longitude': np.float64,
                      'Date_pose': 'datetime64[ns]', 'Date_depose': 'datetime64[ns]',
-                     'Ouverture_pose': np.float64, 'Date_collecte': 'datetime64[ns]'}
+                     'Ouverture_pose': str, 'Date_collecte': 'datetime64[ns]'}
 
     sensors_df = pd.read_sql('select * from sensors_info_tb', con=db.engine, dtype=sensors_dtype)
+    sensors_df.replace('None', '', inplace=True)
+    sensors_df.replace('nan', '', inplace=True)
+
     # les valeurs vides sont notées nan dans le dict, et apparaissent null dans le store
-    sensors_df["Date_pose"] = sensors_df['Date_pose'].dt.strftime('%d/%m/%Y')
-    sensors_df["Date_depose"] = sensors_df['Date_depose'].dt.strftime('%d/%m/%Y')
-    sensors_df["Date_collecte"] = sensors_df['Date_collecte'].dt.strftime('%d/%m/%Y')
+    sensors_df['Date_pose'] = sensors_df['Date_pose'].dt.strftime('%d/%m/%Y')
+    sensors_df['Date_depose'] = sensors_df['Date_depose'].dt.strftime('%d/%m/%Y')
+    sensors_df['Date_collecte'] = sensors_df['Date_collecte'].dt.strftime('%d/%m/%Y')
     return sensors_df.to_dict('records')
 
 
 def save_measures(db, data, sensor_id):
-    df = pd.DataFrame(data)
+    df = pd.DataFrame(data)  # to do faire la conversion en unix ici
 
     for index, row in df.iterrows():
         parameters = {'unix': row['unix'], 'mm': row['mm'], 'celsius': row['celsius']}

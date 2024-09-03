@@ -42,7 +42,7 @@ def create_time_series_fig(df, table_name, delta_mm):
                              )
                   )
 
-    delta_mm = 0 if delta_mm == "" or pd.isna(delta_mm) else np.float64(delta_mm)
+    delta_mm = 0 if delta_mm == '' else np.float64(delta_mm)
 
     fig.add_trace(go.Scatter(y=df["mm"] - delta_mm,
                              x=df.index,
