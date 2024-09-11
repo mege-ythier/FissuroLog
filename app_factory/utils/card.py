@@ -53,7 +53,7 @@ left_column = html.Div(id='left_colum_form',
                            dcc.Dropdown(
                                options=pd.Series(["RER", "METRO", "TRAM"]),
                                id='dropdown-net',
-                               value=['RER'],
+                               value=[''],
                                multi=True,
                                style={'minWidth': '100px'}
                            ),
@@ -68,7 +68,7 @@ left_column = html.Div(id='left_colum_form',
                            html.H5("Date de la pose *"),
                            dcc.Textarea(
                                id='textarea-date-pose',
-                               value='01/01/2000',
+                               value='',
                                rows=1
                            ),
                            html.H5("Ouverture à la pose"),
@@ -81,7 +81,7 @@ left_column = html.Div(id='left_colum_form',
                            html.H5("Latitude *"),
                            dcc.Textarea(
                                id='textarea-lat',
-                               value='48.86461089629031',
+                               value='',
                                rows=1
                            ),
                            html.H5("Date de la collecte"),
@@ -104,7 +104,7 @@ right_column = html.Div(id='right_colum_form', children=[
     html.H5("ligne"),
     dcc.Dropdown(
         options=all_lines,
-        value=['A'],
+        value=[''],
         id='dropdown-line',
         multi=True,
         style={'minWidth': '100px'}
@@ -124,7 +124,7 @@ right_column = html.Div(id='right_colum_form', children=[
     html.H5("localisation dans l'ouvrage *"),
     dcc.Textarea(
         id='textarea-zone',
-        value='test',
+        value='',
         maxLength=20,
         title='exemple : voute, piedroit .....',
         rows=1
@@ -132,7 +132,7 @@ right_column = html.Div(id='right_colum_form', children=[
     html.H5("Longitude *"),
     dcc.Textarea(
         id='textarea-long',
-        value='2.3300408349807364',
+        value='',
         rows=1
     ),
 
@@ -210,7 +210,7 @@ select_card = html.Div(
         options_card,
         dcc.Graph(id='map',
                   config={'displaylogo': False, 'doubleClickDelay': 1000},
-                  figure=create_map([], -1,48.8566,2.3522 ),
+                  figure=create_map([], -1,48.8566,2.3522),
                   selectedData=None,
                   clickData=None
                   )

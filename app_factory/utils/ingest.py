@@ -169,7 +169,7 @@ def save_image(db, selected_data, image_content, image_name, card_id):
 
         sensor_id = selected_data['points'][0]['customdata'][0]
         content_format, content_string = image_content.split(',')
-        if content_format != ["data:image/jpg;base64", "data:image/png;base64"]:
+        if content_format not in ["data:image/jpg;base64", "data:image/png;base64"]:
             raise ValueError("Le fichier n'est pas une image (format png ou jpg).")
         decoded = base64.b64decode(content_string)
         if len(decoded) > 4000000:
