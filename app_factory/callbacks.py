@@ -260,8 +260,8 @@ def register_owner_callbacks(dash_app):
             mylogger.info(
                 f"{current_user.email} store {len(store)} lignes dans le store-data-uploaded, la première est {store[0]}")
             return DataTable(
-                data=df.drop("unix", axis=1).to_dict('records'),
-                columns=[{'name': i, 'id': i} for i in df.drop("unix", axis=1).columns],
+                data=df.to_dict('records'),
+                columns=[{'name': i, 'id': i} for i in df.columns],
                 page_size=10
             ), False, True
 

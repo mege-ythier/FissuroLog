@@ -24,24 +24,10 @@ def parse_file_and_update_ingest_card(contents, filename):
 
         try:
             provider = "Ginger1D"
-            ginger_schema = {
-                'ANNEE': int,
-                'MOIS': int,
-                'JOUR': int,
-                'HEURE': int,
-                'MIN': int,
-                'SEC': float,
-                'Capteur(mm)': float,
-                'Temp Int(°C)': float}
 
             if content_type == "data:text/csv;base64" or content_type == "data:application/vnd.ms-excel;base64":
-                df = pd.read_csv(io.StringIO(decoded.decode('ISO-8859-1')), dtype=ginger_schema, sep=";", decimal=",")
-                columns_selected = [col for col in df.columns if col in ginger_schema.keys()]
-                df = df[columns_selected]
-                if 'Temp Int(°C)' not in df.columns:
-                    df['Temp Int(°C)'] = np.NAN
-
-                if set(df.columns) == set(ginger_schema.keys()):
+                df = pd.read_csv(io.StringIO(decoded.decode('ISO-8859-1')), sep=";", decimal=",")
+                if all([elmt in df.columns for elmt in ['ANNEE', 'MOIS', 'JOUR', 'HEURE', 'MIN', 'SEC']]):
                     df["Date"] = pd.to_datetime(pd.DataFrame({
                         'year': df["ANNEE"],
                         'month': df["MOIS"],
@@ -50,18 +36,26 @@ def parse_file_and_update_ingest_card(contents, filename):
                         'minute': df['MIN'],
                         'second': df['SEC']}))
                     df.drop(["ANNEE", "MOIS", "JOUR", "HEURE", "MIN", "SEC"], axis=1, inplace=True)
+
+                else:
+                    raise ValueError("Les entêtes des colonnes de temps sont manquantes")
+
+                if 'Capteur(mm)' in df.columns:
+                    if 'Temp Int(°C)' not in df.columns: df['Temp Int(°C)'] = np.NAN
                     df.rename(columns={"Capteur(mm)": "mm", "Temp Int(°C)": "celsius"}, inplace=True)
 
-                    df["unix"] = df["Date"].apply(lambda x: int(x.timestamp()))
+                elif 'Ext1(mm)' in df.columns:
+                    if 'Board Temp(°C)' not in df.columns: df['Board Temp(°C)'] = np.NAN
+                    df.rename(columns={'Ext1(mm)': "mm", 'Board Temp(°C)': "celsius"}, inplace=True)
                 else:
-                    raise ValueError("Les entêtes des colonnes du fichier sont incorrectes")
+                    raise ValueError("Les entêtes des colonnes de deformations sont manquantes")
+
+                df = df[['Date', 'mm', 'celsius']]
+
 
             else:
                 provider = "Sites1D"
-                sites_schema = {
-                    'Date': str,
-                    'mm': float,
-                    '°C': float}
+                sites_schema = {'Date': str, 'mm': float, '°C': float}
                 df = pd.read_csv(io.StringIO(decoded.decode('ISO-8859-1')), sep="\t", skiprows=1, dtype=sites_schema)
                 columns_selected = [col for col in df.columns if col in ['Date', 'mm', '°C']]
                 df = df[columns_selected]
@@ -70,7 +64,6 @@ def parse_file_and_update_ingest_card(contents, filename):
                 if set(df.columns) == set(sites_schema.keys()):
                     df = df.rename(columns={"°C": "celsius"})
                     df["Date"] = pd.to_datetime(df["Date"], dayfirst=True)
-                    df["unix"] = df["Date"].apply(lambda x: int(x.timestamp()))
 
                 else:
                     df = pd.read_csv(io.StringIO(decoded.decode('utf-8')), sep='\t', skiprows=1, dtype=sites_schema)
@@ -78,7 +71,6 @@ def parse_file_and_update_ingest_card(contents, filename):
                     df = df[columns_selected]
                     if set(df.columns) == set(sites_schema.keys()):
                         df["Date"] = pd.to_datetime(df["Date"], dayfirst=True)
-                        df["unix"] = df["Date"].apply(lambda x: int(x.timestamp()))
 
                     else:
                         raise ValueError("Les entêtes des colonnes du fichier sont incorrectes")
@@ -100,11 +92,10 @@ def parse_file_and_update_ingest_card(contents, filename):
 
 
 def save_old_sensors_info(db, sensors_json, new_sensor_dict):
-
     sensors_df = pd.DataFrame(data=sensors_json)
     sensors_df.set_index('Id', inplace=True)
     sensor_id = new_sensor_dict["Id"]
-    #calcul des différences
+    # calcul des différences
     old_sensor_dict = sensors_df.loc[sensor_id, :].to_dict()
     old_sensor_dict["Id"] = sensor_id
 
@@ -226,13 +217,17 @@ def query_sensors_info(db):
 
     sensors_df['Date_pose'] = sensors_df['Date_pose'].dt.strftime('%d/%m/%Y')
     sensors_df['Date_depose'] = sensors_df['Date_depose'].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else '')
-    sensors_df['Date_collecte'] = sensors_df['Date_collecte'].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else '')
+    sensors_df['Date_collecte'] = sensors_df['Date_collecte'].apply(
+        lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else '')
 
     return sensors_df.to_dict('records')
 
 
 def save_measures(db, data, sensor_id):
     df = pd.DataFrame(data)  # to do faire la conversion en unix ici
+    df["Date"] = pd.to_datetime(df["Date"])
+    df["unix"] = df["Date"].apply(lambda x: int(x.timestamp()))
+    df.drop('Date', inplace=True, axis=1)
 
     for index, row in df.iterrows():
         parameters = {'unix': row['unix'], 'mm': row['mm'], 'celsius': row['celsius']}
