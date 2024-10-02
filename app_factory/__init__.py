@@ -43,8 +43,6 @@ def create_app():
         # Create Database
         #db.drop_all()
         db.create_all()
-        # add metadata from tables not in the model
-        #db.metadata.reflect(bind=db.engine)
 
         dash_debug = app.config["DASH_DEBUG"]
         dash_auto_reload = app.config["DASH_AUTO_RELOAD"]
@@ -55,7 +53,7 @@ def create_app():
             server=app,
             title="App Fissurolog owner",
             url_base_pathname='/dash_fissurolog_owner/',
-            assets_folder=get_root_path(__name__) + '/static/',
+            assets_folder=get_root_path(__name__) + '/assets/fissurolog/',
             meta_tags=[meta_viewport],
             serve_locally=True,
             prevent_initial_callbacks=True
@@ -75,7 +73,7 @@ def create_app():
             server=app,
             title="App Fissurolog guest",
             url_base_pathname='/dash_fissurolog_guest/',
-            assets_folder=get_root_path(__name__) + '/static/',
+            assets_folder=get_root_path(__name__) + '/assets/fissurolog/',
             meta_tags=[meta_viewport],
             serve_locally=True,
             prevent_initial_callbacks=True

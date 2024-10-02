@@ -210,7 +210,7 @@ select_card = html.Div(
         options_card,
         dcc.Graph(id='map',
                   config={'displaylogo': False, 'doubleClickDelay': 1000},
-                  figure=create_map([], -1,48.8566,2.3522),
+                  figure=create_map([], -1, 48.8566,2.3522),
                   selectedData=None,
                   clickData=None
                   )
@@ -220,7 +220,7 @@ header = html.Div(
     id='header-card',
     children=[html.Img(src='/static/img/logo_ratp_infra_pour_dash.png', width='15%', style={'float': 'right'}),
               html.H1(id='welcome-info'),
-              html.A('menu', href='/'),
+              html.A('accueil', href='/'),
               dcc.Location(id='url', refresh=False)])
 
 image_card = html.Div(id='image-card', hidden=True,
