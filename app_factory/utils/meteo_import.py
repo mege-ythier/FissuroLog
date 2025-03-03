@@ -75,13 +75,13 @@ def get_meteo():
 
     for id in id_stations:
         url = f'https://public-api.meteofrance.fr/public/DPPaquetObs/v1/paquet/infrahoraire-6m?id_station={id}&format=json'
-        response = client.request('GET', url=url, verify=False)
         try:
+            response = client.request('GET', url=url, verify=False)
             dfi = transform_meteo_response(response, id)
-        except Exception:
+        except Exception as e:
+            mylogger.error(f"echec du telechargement de la station {id} : {e}")
             df = df
         else:
-
             df = pd.concat([df, dfi], axis=0)
 
     return pd.DataFrame(df)
