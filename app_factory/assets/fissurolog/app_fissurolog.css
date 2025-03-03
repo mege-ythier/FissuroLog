@@ -5,7 +5,7 @@ body, h1, h2, h3, h4, h5,p.DateInput_input {
 
 h1 {font-size:1.8em; font-family: Montserrat, serif; font-weight: bold}
 
-h2 {color : rgb(255, 255, 255); font-size: 1.5em; font-family: Montserrat, serif ; }
+h2 {color : rgb(255, 255, 255); font-size: 1.4em; font-family: Montserrat, serif ; }
 
 h3 {background-color: #e5dae4}
 
@@ -149,7 +149,7 @@ textarea {line-height: 0.9em; /*background-color: rgb(192, 255, 208);*/}
 
                     #options-card {
                         height: 35px;
-                        min-width: 560px;
+                        /*min-width: 560px;*/
                         display: flex;
                         flex-direction: row;
                         gap:20px;

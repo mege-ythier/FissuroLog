@@ -5,7 +5,6 @@ import plotly.graph_objects as go
 import pandas as pd
 import json
 from dash import dcc, html
-from flask_login import current_user
 from sqlalchemy import text
 
 fig0 = go.Figure()
@@ -171,7 +170,7 @@ def create_time_series_fig(df, table_name, delta_mm):
         yaxis2=dict(
             anchor="x",
             autorange="reversed",
-            domain=[0.55, 1],
+            domain=[0.6, 1],
             # linecolor="#E91E63",
             mirror=True,
             title="°C",
@@ -287,9 +286,9 @@ def create_time_series_fig(df, table_name, delta_mm):
 
 
 def create_map(sensors_json: list[dict], sensor_index, lat , lon):
-    with open("./data_ratp/traces-du-reseau-de-transport-ferre-ratp.geojson", "r") as lines:
+    with open("./app_factory/static/json/traces-du-reseau-de-transport-ferre-ratp.geojson", "r") as lines:
         ratp_dict = json.load(lines)
-    with open("./data_ratp/couleur-ratp-carte.json", 'r') as files:
+    with open("./app_factory/static/json/couleur-ratp-carte.json", 'r') as files:
         color_dict = json.load(files)
 
     fig = go.Figure()
@@ -397,13 +396,12 @@ def create_map(sensors_json: list[dict], sensor_index, lat , lon):
 
     return fig
 
-
-def query_time_series_and_create_fig_card(db, sensor_id, start_date, end_date, aggregate, delta):
+def query_time_series(db, sensor_id, start_date, end_date, aggregate):
     start_date_timestamp = datetime.strptime(start_date, "%Y-%m-%d").timestamp()
     end_date_timestamp = datetime.strptime(end_date, "%Y-%m-%d").timestamp()
     query = ""
-
-    if aggregate == "brute":
+    df = pd.DataFrame()
+    if aggregate =="brute":
         query = text(f"""
         SELECT *
         FROM F{sensor_id}
@@ -411,9 +409,30 @@ def query_time_series_and_create_fig_card(db, sensor_id, start_date, end_date, a
         """)
         df = pd.read_sql(query, con=db.engine)
         df['Date'] = pd.to_datetime(df['unix'], unit='s')
-        df.drop('unix', axis=1)
+        df = df.drop('unix', axis=1)
 
-    else:
+    if aggregate == "1jour":
+        if db.engine.name == 'sqlite':
+            query = text(f"""
+                      SELECT date(unix, 'unixepoch') AS Date, mm, celsius
+                      FROM F{sensor_id}
+                      WHERE unix > {start_date_timestamp} and unix < {end_date_timestamp}
+                      GROUP BY Date
+                      ORDER BY Date
+                  """)
+
+        if db.engine.name == 'mysql':
+            query = text(
+                f"""
+                      SELECT DATE_FORMAT(FROM_UNIXTIME(unix), '%Y-%m-%d') AS Date, AVG(mm) AS mm, AVG(celsius) AS celsius
+                      FROM F{sensor_id}
+                      WHERE unix > {start_date_timestamp} and unix < {end_date_timestamp}
+                      GROUP BY Date
+                      ORDER BY Date
+                  """)
+        df = pd.read_sql(query, con=db.engine)
+
+    if aggregate == "1h":
         if db.engine.name == 'sqlite':
             query = text(f"""
                 SELECT  strftime('%Y-%m-%d %H:00:00', datetime(unix,'unixepoch')) AS Date, mm, celsius
@@ -433,24 +452,8 @@ def query_time_series_and_create_fig_card(db, sensor_id, start_date, end_date, a
             """)
 
         df = pd.read_sql(query, con=db.engine)
-
     df = df.set_index('Date')
-    size_on_memory = df.memory_usage(index=True, deep=False).sum()
-
-    fig_message = "Données trop volumineuses pour être affichées 😢.  Modifies les options 🖊️."
-    children = []
-
-    if size_on_memory <= 200000:
-        fig = create_time_series_fig(df, sensor_id, delta)
-        children = [dcc.Graph(id='time-series', figure=fig, config={'displaylogo': False})]
-
-        fig_message = [f"Le capteur F{sensor_id} est sélectionné 😎. Ses mesures sont affichées sur le graphe 👇."]
-
-        if current_user.role == "owner":
-            fig_message = fig_message + ["Tu peux ajouter de nouvelles mesures à ce capteur, le supprimer, "
-                                         "ou modifier ces caractéristiques 👈."]
-
-    return children, fig_message
+    return df
 
 
 def query_images_and_create_image_card(db, sensor_id, card_id, role):

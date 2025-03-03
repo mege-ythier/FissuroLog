@@ -1,7 +1,5 @@
 """Flask app configuration."""
-import logging
-from datetime import datetime
-from logging.handlers import RotatingFileHandler
+
 from os import environ, path
 
 from dotenv import load_dotenv

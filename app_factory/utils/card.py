@@ -5,7 +5,7 @@ from datetime import datetime
 import json
 from app_factory.utils.fig import create_map
 
-with open("./data_ratp/traces-du-reseau-de-transport-ferre-ratp.geojson", "r") as lines:
+with open("./app_factory/static/json/traces-du-reseau-de-transport-ferre-ratp.geojson", "r") as lines:
     ratp_dict = json.load(lines)
 
 all_lines = ["all"]
@@ -37,7 +37,7 @@ options_card = html.Div(
         html.Div(className='options_card_children', children=[
             html.H2("fréquence"),
             dcc.RadioItems(
-                ['basse', 'brute'],
+                ['brute','1h','1jour'],
                 'brute',
                 id='aggregate-choice',
                 labelStyle={'display': 'inline-block'}
@@ -163,12 +163,15 @@ upload_card = html.Div(id="upload-file-card",
 
 button_card = html.Div(id='button-card',
                        children=[
-
-                           html.Button(id='button-ingest', hidden=True,
-                                       title='intégrer les mesures dans la database'),
                            html.Button(title='Supprimer le capteur', id='button-delete-table', hidden=True),
                            html.Button(title='modifier les informations du capteur',
                                        id='button-update-sensors-info', hidden=True),
+
+                           html.Button(id='button-ingest', hidden=True,
+                                       title='intégrer les mesures dans la database',
+                                       children=dcc.Loading(type="circle", id='loading-database')),
+
+
                        ])
 
 owner_card = html.Div(id='owner-card', children=[

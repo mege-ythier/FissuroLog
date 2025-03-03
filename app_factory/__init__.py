@@ -83,8 +83,24 @@ def create_app():
         dash_app_fissurolog_guest.layout = guest_layout
 
         dash_app_fissurolog_guest.enable_dev_tools(debug=dash_debug, dev_tools_hot_reload=dash_auto_reload)
-
+        from .callbacks import register_meteo_callbacks
         register_callbacks(dash_app_fissurolog_guest)
+
+        dash_app_meteo = Dash(
+            __name__,
+            server=app,
+            title="App meteo",
+            url_base_pathname='/dash_meteo/',
+            assets_folder=get_root_path(__name__) + '/assets/meteo/',
+            meta_tags=[meta_viewport],
+            serve_locally=True,
+            prevent_initial_callbacks=True)
+
+        from app_factory.layout import meteo_layout
+        dash_app_meteo.layout = meteo_layout
+        from app_factory.callbacks import register_meteo_callbacks
+        register_meteo_callbacks(dash_app_meteo)
+        dash_app_meteo.enable_dev_tools(debug=dash_debug, dev_tools_hot_reload=dash_auto_reload)
 
         def dash_login_required(funct, role):
             @wraps(funct)
@@ -101,7 +117,7 @@ def create_app():
         for view_func in app.view_functions:
             if view_func.startswith('/dash_fissurolog_owner/'):
                 app.view_functions[view_func] = dash_login_required(app.view_functions[view_func], 'owner')
-            if view_func.startswith('/dash_fissurolog_guest/'):
+            elif view_func.startswith('/dash_fissurolog_guest/'):
                 app.view_functions[view_func] = dash_login_required(app.view_functions[view_func], 'guest')
 
         return app

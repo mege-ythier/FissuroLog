@@ -1,0 +1,18 @@
+
+
+@font-face {
+    font-family: 'Material Symbols Outlined';
+    font-style: normal;
+    src: url(MaterialSymbolsOutlined.woff2) format('woff2');
+  }
+
+  @font-face {
+    font-family: 'Material Symbols Rounded';
+    font-style: normal;
+    src: url(MaterialSymbolsRounded.woff2) format('woff2');
+  }
+  @font-face {
+    font-family: 'Material Symbols Sharp';
+    font-style: normal;
+    src: url(MaterialSymbolsSharp.woff2) format('woff2');
+  }

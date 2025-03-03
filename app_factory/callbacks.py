@@ -1,6 +1,5 @@
 import time
 import re
-from dash import html, Input, Output, State
 from dash.dash_table import DataTable
 from dash.exceptions import PreventUpdate
 import pandas as pd
@@ -11,10 +10,18 @@ from sqlalchemy import text, Table, MetaData, Column, Float, Integer, inspect
 from app_factory.models import SensorInfo
 from app_factory.utils.ingest import save_image, parse_file_and_update_ingest_card, save_new_sensors_info, \
     save_old_sensors_info, query_sensors_info, save_measures
-from app_factory.utils.fig import create_map, query_time_series_and_create_fig_card, query_images_and_create_image_card
+from app_factory.utils.fig import create_map, query_images_and_create_image_card, \
+    create_time_series_fig, query_time_series
 from app_factory import db
 
 import logging.config
+
+import plotly.graph_objects as go
+from dash import html, Input, Output, State, dcc
+
+from app_factory.utils.meteo_graph import draw_ratp_map, draw_cum_6h_vs_time_for_all_stations, \
+ add_stations_to_map
+from app_factory.utils.meteo_import import get_meteo, get_climato
 
 logging.config.fileConfig('logging.conf', disable_existing_loggers=True)
 mylogger = logging.getLogger(__name__)
@@ -66,7 +73,7 @@ def register_callbacks(dash_app):
     def show_update_button(start_date, end_date, aggregate, selected_data):
 
         if selected_data and 'points' in selected_data.keys() and len(selected_data['points']) > 0:
-            return False, "Appuies sur le bouton pour mettre à jour le graphique."
+            return False, "Selectionne la période et la fréquence des mesures à afficher sur le graphique."
         else:
             raise PreventUpdate
 
@@ -88,6 +95,7 @@ def register_callbacks(dash_app):
         Output('time-series-card', 'children', allow_duplicate=True),
         Output('fig-message', 'children', allow_duplicate=True),
         Output('image-message', 'children'),
+        Output('aggregate-choice', 'value'),
         Input('button-update-fig', 'n_clicks'),
         Input('map', 'selectedData'),
         State('date-picker-select', "start_date"),
@@ -95,7 +103,7 @@ def register_callbacks(dash_app):
         State('aggregate-choice', 'value'),
         State('store-sensors-info', 'data'),
         State('image-card', 'hidden'))
-    def update_with_select_on_map(n_click, selected_data, start_date, end_date, aggregate, sensor_json,
+    def update_with_select_on_map(n_click, selected_data, start_date, end_date, aggregate_state, sensor_json,
                                   image_card_is_hidden):
 
         fig_card_children = []
@@ -103,6 +111,7 @@ def register_callbacks(dash_app):
         image_message = ""
         image1 = ""
         image2 = ""
+        aggregate_output = aggregate_state
 
         if selected_data and 'points' in selected_data.keys() and len(selected_data['points']) > 0:
 
@@ -114,9 +123,29 @@ def register_callbacks(dash_app):
 
                 delta = sensors_df.loc[sensor_id, "Ouverture_pose"]
 
-                fig_card_children, fig_message = query_time_series_and_create_fig_card(db, sensor_id, start_date,
-                                                                                       end_date, aggregate,
-                                                                                       delta)
+                df = query_time_series(db, sensor_id, start_date, end_date, aggregate_state)
+
+                size_on_memory = df.memory_usage(index=True, deep=False).sum()
+
+                if size_on_memory > 200000:
+                    if aggregate_state == "brute":
+                        aggregate_output = "1h"
+                        df = query_time_series(db, sensor_id, start_date, end_date, aggregate_output)
+                    else:
+                        aggregate_output = "1jour"
+                        df = query_time_series(db, sensor_id, start_date, end_date, aggregate_output)
+
+                fig = create_time_series_fig(df, sensor_id, delta)
+                fig_card_children = [dcc.Graph(id='time-series', figure=fig, config={'displaylogo': False})]
+
+                fig_message = [
+                    f"Le capteur F{sensor_id} est sélectionné 😎. Ses mesures sont affichées sur le graphe 👇."]
+
+                if current_user.role == "owner":
+                    fig_message = fig_message + ["Tu peux ajouter de nouvelles mesures à ce capteur, le supprimer, "
+                                                 "ou modifier ces caractéristiques 👈."]
+
+
                 image1 = query_images_and_create_image_card(db, sensor_id, 1, current_user.role)
                 image2 = query_images_and_create_image_card(db, sensor_id, 2, current_user.role)
 
@@ -126,7 +155,7 @@ def register_callbacks(dash_app):
 
         if image_card_is_hidden:
             time.sleep(0)
-        return True, image1, image2, fig_card_children, fig_message, image_message
+        return True, image1, image2, fig_card_children, fig_message, image_message, aggregate_output
 
 
 def register_owner_callbacks(dash_app):
@@ -371,6 +400,7 @@ def register_owner_callbacks(dash_app):
         Output('map', 'selectedData'),
         Output('store-data-uploaded', 'data', allow_duplicate=True),
         Output('store-sensor-info-to-ingest', 'data', allow_duplicate=True),
+        Output('loading-database', 'children'),
         Input('confirm-throw-ingestion', 'submit_n_clicks'),
         State('store-data-uploaded', 'data'),
         State('store-sensors-info', 'data'),
@@ -396,7 +426,7 @@ def register_owner_callbacks(dash_app):
                 mylogger.error(f"{current_user.email} échoue l'intégration des mesures du capteur {sensor_id}")
                 database_info = "❌❌❌ Les mesures n'ont pas été intégrées."
                 sensors_json = query_sensors_info(db)
-                return sensors_json, database_info, selected_data, data, {}
+                return sensors_json, database_info, selected_data, data, {}, ""
             else:
                 db.session.commit()
                 table_length_after = db.session.execute(text(f"SELECT COUNT(*) FROM F{sensor_id};")).scalar()
@@ -420,7 +450,7 @@ def register_owner_callbacks(dash_app):
                             f"{current_user.email} met à jour les informations du capteur {sensor_id} suivantes: {message}")
                         database_info = database_info + [f"😍Informations mises à jour."]
 
-                return sensors_json, database_info, selected_data, [], {}
+                return sensors_json, database_info, selected_data, [], {}, ""
 
 
         else:
@@ -506,10 +536,10 @@ def register_owner_callbacks(dash_app):
                             database_info = database_info + (
                                 [f"✔️ Intégration de {table_length} mesures "])
 
-                        return sensors_json, database_info, selected_data, [], {}
+                        return sensors_json, database_info, selected_data, [], {}, ""
 
             # database_info = "🔥🔥🔥 Echec de la création du capteur"
-            return query_sensors_info(db), database_info, selected_data, data, new_sensor_dict
+            return query_sensors_info(db), database_info, selected_data, data, new_sensor_dict, ""
 
     @dash_app.callback(
 
@@ -678,3 +708,152 @@ def register_owner_callbacks(dash_app):
             card_id=2)
 
         return upload_info, html.Img(src=image_contents, width='100%')
+
+
+def register_meteo_callbacks(app):
+    @app.callback(
+        Output('store-meteo', 'data'),
+        Output('loading-store', 'children'),
+        Input('url', 'pathname'))
+    def store_meteo(click):
+        # df = pd.read_csv('transformed_meteo.csv', sep=',')
+        # df['id_station'] = df['id_station'].astype(str)
+        df = get_meteo()
+        map = add_stations_to_map(draw_ratp_map(), df)
+        return df.to_dict('records'), dcc.Graph(id='map', figure=map,
+                                                config={'displaylogo': False, 'doubleClickDelay': 1000,
+                                                        'scrollZoom': True})
+
+    @app.callback(
+        Output('store-climato', 'data'),
+        Output('loading-store', 'children', allow_duplicate=True),
+        Input('load-button', 'n_clicks'),
+        State('date-picker', 'start_date'),
+        State('date-picker', 'end_date'),
+        State('checklist-stations', 'value'),
+    )
+    def store_climato(click, ti, tf, id_stations):
+
+        # df = pd.read_csv('transformed_climato.csv', sep=',')
+        # df['id_station'] = df['id_station'].astype(str)
+        df = get_climato(ti, tf, id_stations)
+
+        map = add_stations_to_map(draw_ratp_map(), df)
+        return df.to_dict('records'), dcc.Graph(id='map', figure=map,
+                                                config={'displaylogo': False, 'doubleClickDelay': 1000,
+                                                        'scrollZoom': True})
+
+    @app.callback(
+        Output('all-stations-output', 'children'),
+        Input('store-meteo', 'data'),
+        Input('store-climato', 'data'),
+        State('toggle-switch', 'value'),
+    )
+    def show_all_stations(meteo_data, climato_data, toggle_switch_value):
+
+        if toggle_switch_value:
+            df = pd.DataFrame(meteo_data)
+            fig = draw_cum_6h_vs_time_for_all_stations(df)
+            return [dcc.Graph(figure=fig)]
+
+        else:
+            if len(climato_data) > 0:
+                df = pd.DataFrame(climato_data)
+                fig = draw_cum_6h_vs_time_for_all_stations(df)
+                return [dcc.Graph(figure=fig)]
+            else:
+                return []
+
+    @app.callback(
+        Output('left-meteo-app', 'style', allow_duplicate=True),
+        Output('all-stations-output', 'children', allow_duplicate=True),
+        Output('loading-store', 'children', allow_duplicate=True),
+        Input('toggle-switch', 'value'),
+        State('store-meteo', 'data'),
+        State('store-climato', 'data'),
+    )
+    def switch(toggle_switch_value, meteo_store, climato_store):
+
+        if toggle_switch_value:
+            df = pd.DataFrame(meteo_store)
+            map = add_stations_to_map(draw_ratp_map(),df)
+
+            fig = draw_cum_6h_vs_time_for_all_stations(df)
+            return {'display': 'none'}, [dcc.Graph(figure=fig)], dcc.Graph(id='map', figure=map,
+                                                                           config={'displaylogo': False,
+                                                                                   'doubleClickDelay': 1000,
+                                                                                   'scrollZoom': True})
+        else:
+
+            if climato_store and len(climato_store) > 0:
+                df = pd.DataFrame(climato_store)
+                map = add_stations_to_map(draw_ratp_map(), df)
+
+                return {'display': 'block'}, [], dcc.Graph(id='map', figure=map,
+                                                           config={'displaylogo': False, 'doubleClickDelay': 1000,
+                                                                   'scrollZoom': True})
+
+            else:
+
+                return {'display': 'block'}, [], dcc.Graph(id='map', figure=draw_ratp_map(),
+                                                           config={'displaylogo': False, 'doubleClickDelay': 1000,
+                                                                   'scrollZoom': True})
+
+    @app.callback(
+        Output('one-station-output', 'children'),
+        Input('map', 'selectedData'),
+        State('store-meteo', 'data'),
+        State('store-climato', 'data'),
+        State('toggle-switch', 'value'),
+    )
+    def show_one_station(selected_data, meteo_store, climato_store, toggle_switch_value):
+        info_stations = pd.read_csv('app_factory/assets/meteo/info_stations.csv', sep=';', index_col="Id_station")
+
+        if selected_data and 'points' in selected_data.keys() and len(selected_data['points']) > 0:
+            id_station = selected_data['points'][0]['customdata']
+            name_station = info_stations.loc[int(id_station), "Nom_usuel"]
+
+            fig = go.Figure()
+            fig.update_layout(
+                title=f"Cumul des précipitations à {name_station}",
+                yaxis=dict(title="mm"),
+                xaxis=dict(title="date"),
+            )
+
+            if toggle_switch_value:
+                df = pd.DataFrame(meteo_store)
+                df['paris_time'] = pd.to_datetime(df['paris_time'])
+                df = df.loc[df.id_station == str(id_station), :].sort_values('paris_time')  # ATTENTION
+                fig.add_trace(go.Scatter(x=df['paris_time'], y=df['cum_6h'], name="6 heures"))
+                fig.add_trace(go.Bar(x=df['paris_time'], y=df['rr_per'], name='6 minutes'))
+            else:
+                df = pd.DataFrame(climato_store)
+                df['paris_time'] = pd.to_datetime(df['paris_time'])
+                df = df.loc[df.id_station == str(id_station), :].sort_values('paris_time')
+                fig.add_trace(go.Scatter(x=df['paris_time'], y=df['cum_6h'], name="6 heures"))
+                fig.add_trace(go.Bar(x=df['paris_time'], y=df['RR1'], name='1 heure'))
+
+            return [dcc.Graph(figure=fig)]
+        return []
+
+    @app.callback(
+        Output('meteo-options', 'style'),
+        Output('hamburger-button', 'children'),
+        Input('hamburger-button', 'n_clicks')
+    )
+    def show_options_to_get_climatologie(click):
+        if click % 2 == 0:
+
+            hamburger_button_children = html.Div(
+                children=[
+                    html.Div(className="hamburger-button-line"),
+                    html.Div(className="hamburger-button-line"),
+                    html.Div(className="hamburger-button-line")],
+                className="hamburger-button-menu")
+
+            return {'display': 'none'}, hamburger_button_children
+        else:
+            return {'display': 'block'}, html.Div(
+                children=[html.Div(className="hamburger-button-cross")],
+                className="hamburger-button-menu"
+            )
